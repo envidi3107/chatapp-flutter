@@ -62,19 +62,21 @@ class _ChatView extends StatefulWidget {
   State<_ChatView> createState() => _ChatViewState();
 }
 
-class _ChatViewState extends State<_ChatView> {
+class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _picker = ImagePicker();
 
   List<XFile> _pickedFiles = [];
   ChatRoomsProvider? _chatRoomsProvider;
+  ChatProvider? _chatProvider;
   StreamSubscription<PresenceUpdateEvent>? _presenceSub;
   StreamSubscription<TypingStatusEvent>? _typingSub;
   StreamSubscription<ReadStatusEvent>? _readSub;
   Timer? _typingDebounce;
   Timer? _typingVisibleTimer;
   Timer? _typingDotsTicker;
+  Timer? _readSyncDebounce;
   bool _isTypingSent = false;
   bool _isPeerTyping = false;
   String? _typingSender;
@@ -85,15 +87,20 @@ class _ChatViewState extends State<_ChatView> {
   bool _isPresenceLoading = false;
   bool? _isPeerOnline;
   DateTime? _lastSeenAt;
+  int? _lastSyncedMessageId;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _myUsername = context.read<AuthProvider>().username;
+    _chatProvider = context.read<ChatProvider>();
+    _chatProvider?.addListener(_onChatUpdated);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<ChatRoomsProvider>();
       _chatRoomsProvider = provider;
       provider.markRoomOpened(widget.roomId);
+      _scheduleReadSync();
     });
 
     _loadPresence();
@@ -104,10 +111,13 @@ class _ChatViewState extends State<_ChatView> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _chatProvider?.removeListener(_onChatUpdated);
     _chatRoomsProvider?.markRoomClosed(widget.roomId);
     _typingDebounce?.cancel();
     _typingVisibleTimer?.cancel();
     _typingDotsTicker?.cancel();
+    _readSyncDebounce?.cancel();
     if (_isTypingSent) {
       unawaited(context.read<ChatProvider>().setTypingStatus(false));
     }
@@ -117,6 +127,44 @@ class _ChatViewState extends State<_ChatView> {
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _scheduleReadSync();
+    }
+  }
+
+  void _onChatUpdated() {
+    final provider = _chatProvider;
+    if (provider == null) {
+      return;
+    }
+
+    final messages = provider.messages;
+    if (messages.isEmpty) {
+      return;
+    }
+
+    final latestId = messages.last.id;
+    if (latestId == null || latestId == _lastSyncedMessageId) {
+      return;
+    }
+
+    _lastSyncedMessageId = latestId;
+    _scheduleReadSync();
+  }
+
+  void _scheduleReadSync() {
+    _readSyncDebounce?.cancel();
+    _readSyncDebounce = Timer(const Duration(milliseconds: 220), () {
+      if (!mounted) {
+        return;
+      }
+
+      unawaited(context.read<ChatProvider>().refreshReadStatus());
+    });
   }
 
   void _subscribeReadStatus() {
@@ -429,13 +477,112 @@ class _ChatViewState extends State<_ChatView> {
     final messages = chat.messages;
 
     int? lastOwnIndex;
-    for (var i = messages.length - 1; i >= 0; i--) {
+    final ownMessageIndexes = <int>[];
+    for (var i = 0; i < messages.length; i++) {
       final item = messages[i];
       if (myUsername != null && item.sender == myUsername) {
-        lastOwnIndex = i;
-        break;
+        ownMessageIndexes.add(i);
       }
     }
+    if (ownMessageIndexes.isNotEmpty) {
+      lastOwnIndex = ownMessageIndexes.last;
+    }
+
+    int? findLastOwnIndexAtOrBefore(DateTime readAt) {
+      for (var i = ownMessageIndexes.length - 1; i >= 0; i--) {
+        final index = ownMessageIndexes[i];
+        final sentOn = messages[index].sentOn;
+        if (sentOn != null && !sentOn.isAfter(readAt)) {
+          return index;
+        }
+      }
+
+      return null;
+    }
+
+    final seenByIndexMap = <int, Map<String, SeenAvatarInfo>>{};
+
+    void addSeenAvatarToIndex(int index, SeenAvatarInfo info) {
+      final username = (info.user.username ?? '').trim();
+      if (username.isEmpty || username == myUsername) {
+        return;
+      }
+
+      final currentMap = seenByIndexMap.putIfAbsent(index, () => {});
+      currentMap[username] = info;
+    }
+
+    _readAtByUser.forEach((username, readAt) {
+      if (username == myUsername) {
+        return;
+      }
+
+      final targetIndex = findLastOwnIndexAtOrBefore(readAt);
+      if (targetIndex == null) {
+        return;
+      }
+
+      final user = _readerByUsername[username] ??
+          UserWithAvatarModel(
+            id: null,
+            username: username,
+            avatar: null,
+          );
+
+      addSeenAvatarToIndex(
+        targetIndex,
+        SeenAvatarInfo(user: user, seenAt: readAt),
+      );
+    });
+
+    final fallbackTargetByUser = <String, int>{};
+    final fallbackProfileByUser = <String, UserWithAvatarModel>{};
+
+    for (final index in ownMessageIndexes) {
+      final item = messages[index];
+      for (final viewer in item.seenBy) {
+        final username = (viewer.username ?? '').trim();
+        if (username.isEmpty || username == myUsername) {
+          continue;
+        }
+
+        if (_readAtByUser.containsKey(username)) {
+          continue;
+        }
+
+        fallbackTargetByUser[username] = index;
+        fallbackProfileByUser[username] = viewer;
+      }
+    }
+
+    fallbackTargetByUser.forEach((username, targetIndex) {
+      final user = fallbackProfileByUser[username] ??
+          UserWithAvatarModel(
+            id: null,
+            username: username,
+            avatar: null,
+          );
+
+      addSeenAvatarToIndex(
+        targetIndex,
+        SeenAvatarInfo(user: user, seenAt: null),
+      );
+    });
+
+    final seenByAvatarsByIndex = <int, List<SeenAvatarInfo>>{};
+    seenByIndexMap.forEach((index, viewersMap) {
+      final viewers = viewersMap.values.toList()
+        ..sort((a, b) {
+          final aTime = a.seenAt?.millisecondsSinceEpoch ?? 0;
+          final bTime = b.seenAt?.millisecondsSinceEpoch ?? 0;
+          if (aTime != bTime) {
+            return bTime.compareTo(aTime);
+          }
+
+          return (a.user.username ?? '').compareTo(b.user.username ?? '');
+        });
+      seenByAvatarsByIndex[index] = viewers;
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -491,47 +638,19 @@ class _ChatViewState extends State<_ChatView> {
                       final isMine =
                           myUsername != null && item.sender == myUsername;
 
-                      final seenByMerged = <String, UserWithAvatarModel>{};
-                      for (final viewer in item.seenBy) {
-                        final username = viewer.username ?? '';
-                        if (username.isEmpty || username == myUsername) {
-                          continue;
-                        }
-                        seenByMerged[username] = viewer;
-                      }
-
-                      final sentOn = item.sentOn;
-                      if (sentOn != null) {
-                        _readAtByUser.forEach((username, readAt) {
-                          if (username == myUsername || sentOn.isAfter(readAt)) {
-                            return;
-                          }
-
-                          seenByMerged[username] =
-                              _readerByUsername[username] ??
-                              UserWithAvatarModel(
-                                id: null,
-                                username: username,
-                                avatar: null,
-                              );
-                        });
-                      }
-
-                      final seenByUsers = seenByMerged.values.toList();
-                      seenByUsers.sort(
-                        (a, b) => (a.username ?? '').compareTo(b.username ?? ''),
-                      );
+                      final seenByAvatars =
+                          isMine ? (seenByAvatarsByIndex[index] ?? const <SeenAvatarInfo>[]) : const <SeenAvatarInfo>[];
 
                       String? deliveryStatus;
                       if (isMine && index == lastOwnIndex) {
-                        deliveryStatus = seenByUsers.isNotEmpty ? 'Đã xem' : 'Đã gửi';
+                        deliveryStatus = seenByAvatars.isNotEmpty ? 'Đã xem' : 'Đã gửi';
                       }
 
                       return MessageBubble(
                         message: item,
                         isMine: isMine,
                         deliveryStatus: deliveryStatus,
-                        seenByUsers: isMine ? seenByUsers : const [],
+                        seenByAvatars: seenByAvatars,
                         onLongPress: () {
                           if (item.id != null && isMine) {
                             _confirmRecall(item.id!);

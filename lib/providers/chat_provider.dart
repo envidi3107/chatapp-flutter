@@ -113,6 +113,10 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshReadStatus() async {
+    await _emitReadStatus();
+  }
+
   Future<void> _emitReadStatus() async {
     try {
       await _messageService.setReadStatus(roomId: _roomId);

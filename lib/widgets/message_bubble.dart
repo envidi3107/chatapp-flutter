@@ -6,6 +6,16 @@ import '../models/message_receive_model.dart';
 import '../models/user_with_avatar_model.dart';
 import 'app_avatar.dart';
 
+class SeenAvatarInfo {
+  const SeenAvatarInfo({
+    required this.user,
+    required this.seenAt,
+  });
+
+  final UserWithAvatarModel user;
+  final DateTime? seenAt;
+}
+
 class MessageBubble extends StatelessWidget {
   const MessageBubble({
     super.key,
@@ -13,14 +23,25 @@ class MessageBubble extends StatelessWidget {
     required this.isMine,
     required this.onLongPress,
     this.deliveryStatus,
-    this.seenByUsers = const [],
+    this.seenByAvatars = const [],
   });
 
   final MessageReceiveModel message;
   final bool isMine;
   final VoidCallback onLongPress;
   final String? deliveryStatus;
-  final List<UserWithAvatarModel> seenByUsers;
+  final List<SeenAvatarInfo> seenByAvatars;
+
+  String _seenTooltip(SeenAvatarInfo info) {
+    final username = (info.user.username ?? '').trim();
+    final name = username.isEmpty ? 'Unknown user' : username;
+    final seenAt = info.seenAt;
+    if (seenAt == null) {
+      return '$name\nĐã xem';
+    }
+
+    return '$name\nĐã xem lúc ${DateFormat('HH:mm dd/MM/yyyy').format(seenAt.toLocal())}';
+  }
 
   void _openImageViewer(BuildContext context, String imageUrl) {
     Navigator.of(context).push(
@@ -150,20 +171,24 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
           ),
-          if (isMine && seenByUsers.isNotEmpty)
+          if (isMine && seenByAvatars.isNotEmpty)
             Container(
               margin: const EdgeInsets.only(right: 14, top: 1),
               height: 16,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  for (final viewer in seenByUsers.take(5))
+                  for (final viewer in seenByAvatars.take(5))
                     Padding(
                       padding: const EdgeInsets.only(left: 2),
-                      child: AppAvatar(
-                        url: viewer.avatar?.source,
-                        name: viewer.username ?? '?',
-                        radius: 7,
+                      child: Tooltip(
+                        message: _seenTooltip(viewer),
+                        waitDuration: const Duration(milliseconds: 180),
+                        child: AppAvatar(
+                          url: viewer.user.avatar?.source,
+                          name: viewer.user.username ?? '?',
+                          radius: 7,
+                        ),
                       ),
                     ),
                 ],
