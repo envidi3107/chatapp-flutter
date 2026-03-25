@@ -40,16 +40,19 @@ class MessageService {
     int? replyTo,
     List<XFile> attachments = const [],
   }) async {
-    final files = <http.MultipartFile>[];
-    for (final file in attachments) {
-      final bytes = await file.readAsBytes();
-      files.add(
-        http.MultipartFile.fromBytes(
-          'attachments',
-          bytes,
-          filename: file.name.isEmpty ? 'upload.bin' : file.name,
-        ),
-      );
+    Future<List<http.MultipartFile>> buildFiles() async {
+      final files = <http.MultipartFile>[];
+      for (final file in attachments) {
+        final bytes = await file.readAsBytes();
+        files.add(
+          http.MultipartFile.fromBytes(
+            'attachments',
+            bytes,
+            filename: file.name.isEmpty ? 'upload.bin' : file.name,
+          ),
+        );
+      }
+      return files;
     }
 
     final response = await _apiClient.postMultipart(
@@ -59,7 +62,7 @@ class MessageService {
         if (text.trim().isNotEmpty) 'message': text.trim(),
         if (replyTo != null) 'replyTo': replyTo.toString(),
       },
-      files: files,
+      buildFiles: buildFiles,
     );
 
     if (response.statusCode != 201) {
@@ -74,16 +77,19 @@ class MessageService {
     int? replyTo,
     List<XFile> attachments = const [],
   }) async {
-    final files = <http.MultipartFile>[];
-    for (final file in attachments) {
-      final bytes = await file.readAsBytes();
-      files.add(
-        http.MultipartFile.fromBytes(
-          'attachments',
-          bytes,
-          filename: file.name.isEmpty ? 'upload.bin' : file.name,
-        ),
-      );
+    Future<List<http.MultipartFile>> buildFiles() async {
+      final files = <http.MultipartFile>[];
+      for (final file in attachments) {
+        final bytes = await file.readAsBytes();
+        files.add(
+          http.MultipartFile.fromBytes(
+            'attachments',
+            bytes,
+            filename: file.name.isEmpty ? 'upload.bin' : file.name,
+          ),
+        );
+      }
+      return files;
     }
 
     final response = await _apiClient.putMultipart(
@@ -92,7 +98,7 @@ class MessageService {
         if (text.trim().isNotEmpty) 'message': text.trim(),
         if (replyTo != null) 'replyTo': replyTo.toString(),
       },
-      files: files,
+      buildFiles: buildFiles,
     );
 
     if (response.statusCode != 204) {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/chat_room_model.dart';
+import '../models/user_with_avatar_model.dart';
 import '../models/message_receive_model.dart';
 import '../services/chat_room_service.dart';
 import '../services/message_service.dart';
@@ -30,6 +31,7 @@ class ChatRoomsProvider extends ChangeNotifier {
   StreamSubscription<InvitationReplyEvent>? _invitationReplySub;
   StreamSubscription<FriendRemovedEvent>? _friendRemovedSub;
   StreamSubscription<PresenceUpdateEvent>? _presenceSub;
+  StreamSubscription<UserWithAvatarModel>? _profileSub;
   final Map<int, int> _unreadCounts = {};
   final Map<int, bool> _roomPeerOnline = {};
 
@@ -178,6 +180,10 @@ class ChatRoomsProvider extends ChangeNotifier {
         notifyListeners();
       }
     });
+
+    _profileSub ??= _realtimeService.profileStream.listen((profile) {
+      applyUserProfileUpdate(profile);
+    });
   }
 
   void stopRealtime() {
@@ -194,6 +200,44 @@ class ChatRoomsProvider extends ChangeNotifier {
 
     _presenceSub?.cancel();
     _presenceSub = null;
+
+    _profileSub?.cancel();
+    _profileSub = null;
+  }
+
+  void applyUserProfileUpdate(UserWithAvatarModel profile) {
+    final username = (profile.username ?? '').trim();
+    if (username.isEmpty || _currentUsername == null) {
+      return;
+    }
+
+    var changed = false;
+    final next = <ChatRoomModel>[];
+
+    for (final room in _rooms) {
+      if (room.type != ChatRoomType.duo || room.duoPeerFor(_currentUsername) != username) {
+        next.add(room);
+        continue;
+      }
+
+      final updated = room.copyWith(
+        name: profile.displayLabel,
+        avatar: profile.avatar,
+      );
+
+      if (updated.name != room.name || updated.avatar?.source != room.avatar?.source) {
+        changed = true;
+      }
+
+      next.add(updated);
+    }
+
+    if (!changed) {
+      return;
+    }
+
+    _rooms = _sortRooms(next);
+    notifyListeners();
   }
 
   Future<void> _hydratePeerPresence() async {

@@ -87,7 +87,7 @@ class ApiClient {
   Future<http.StreamedResponse> postMultipart(
     String path, {
     required Map<String, String> fields,
-    required List<http.MultipartFile> files,
+    required Future<List<http.MultipartFile>> Function() buildFiles,
     Map<String, dynamic>? query,
     bool authRequired = true,
   }) async {
@@ -99,7 +99,7 @@ class ApiClient {
       ),
     );
     request.fields.addAll(fields);
-    request.files.addAll(files);
+    request.files.addAll(await buildFiles());
     var streamed = await request.send();
 
     if (authRequired && streamed.statusCode == 401 && await _refreshToken()) {
@@ -111,7 +111,7 @@ class ApiClient {
         ),
       );
       retry.fields.addAll(fields);
-      retry.files.addAll(files);
+      retry.files.addAll(await buildFiles());
       streamed = await retry.send();
     }
 
@@ -121,7 +121,7 @@ class ApiClient {
   Future<http.StreamedResponse> putMultipart(
     String path, {
     required Map<String, String> fields,
-    required List<http.MultipartFile> files,
+    required Future<List<http.MultipartFile>> Function() buildFiles,
     Map<String, dynamic>? query,
     bool authRequired = true,
   }) async {
@@ -133,7 +133,7 @@ class ApiClient {
       ),
     );
     request.fields.addAll(fields);
-    request.files.addAll(files);
+    request.files.addAll(await buildFiles());
     var streamed = await request.send();
 
     if (authRequired && streamed.statusCode == 401 && await _refreshToken()) {
@@ -145,7 +145,7 @@ class ApiClient {
         ),
       );
       retry.fields.addAll(fields);
-      retry.files.addAll(files);
+      retry.files.addAll(await buildFiles());
       streamed = await retry.send();
     }
 

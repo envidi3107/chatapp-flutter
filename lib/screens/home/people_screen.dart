@@ -278,12 +278,17 @@ class _PeopleScreenState extends State<PeopleScreen> {
                 )
               else
                 ...provider.users.map((user) {
+                  final displayName = user.displayLabel;
+                  final username = user.username ?? '';
                   return ListTile(
                     leading: AppAvatar(
                       url: user.avatar?.source,
-                      name: user.username ?? 'U',
+                      name: displayName,
                     ),
-                    title: Text(user.username ?? 'Unknown user'),
+                    title: Text(displayName),
+                    subtitle: username.isNotEmpty && username != displayName
+                        ? Text('@$username')
+                        : null,
                     trailing: FilledButton.tonal(
                       onPressed: user.username == null
                           ? null

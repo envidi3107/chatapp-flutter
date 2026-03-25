@@ -120,6 +120,8 @@ class RealtimeService {
       StreamController<FriendRemovedEvent>.broadcast();
   final StreamController<PresenceUpdateEvent> _presenceController =
       StreamController<PresenceUpdateEvent>.broadcast();
+    final StreamController<UserWithAvatarModel> _profileController =
+      StreamController<UserWithAvatarModel>.broadcast();
   final Map<int, StreamController<MessageReceiveModel>> _roomControllers = {};
   final Map<int, StreamController<TypingStatusEvent>> _typingControllers = {};
   final Map<int, StreamController<ReadStatusEvent>> _readControllers = {};
@@ -135,6 +137,7 @@ class RealtimeService {
       _friendRemovedController.stream;
 
   Stream<PresenceUpdateEvent> get presenceStream => _presenceController.stream;
+  Stream<UserWithAvatarModel> get profileStream => _profileController.stream;
 
   Stream<MessageReceiveModel> roomMessageStream(int roomId) {
     _requestedRooms.add(roomId);
@@ -213,6 +216,7 @@ class RealtimeService {
           _subscribeInvitationReplies();
           _subscribeFriendRemoved();
           _subscribePresence();
+          _subscribeProfileUpdates();
           for (final roomId in _requestedRooms) {
             _subscribeRoom(roomId);
             _subscribeTyping(roomId);
@@ -261,6 +265,7 @@ class RealtimeService {
     _invitationReplyController.close();
     _friendRemovedController.close();
     _presenceController.close();
+    _profileController.close();
     for (final controller in _roomControllers.values) {
       controller.close();
     }
@@ -445,6 +450,25 @@ class RealtimeService {
         }
 
         _presenceController.add(PresenceUpdateEvent.fromJson(decoded));
+      },
+    );
+  }
+
+  void _subscribeProfileUpdates() {
+    _client?.subscribe(
+      destination: '/queue/users/profile/',
+      callback: (frame) {
+        final body = frame.body;
+        if (body == null || body.isEmpty) {
+          return;
+        }
+
+        final decoded = jsonDecode(body);
+        if (decoded is! Map<String, dynamic>) {
+          return;
+        }
+
+        _profileController.add(UserWithAvatarModel.fromJson(decoded));
       },
     );
   }

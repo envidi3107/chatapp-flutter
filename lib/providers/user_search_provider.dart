@@ -37,4 +37,28 @@ class UserSearchProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  void applyUserProfileUpdate(UserWithAvatarModel profile) {
+    final username = (profile.username ?? '').trim();
+    if (username.isEmpty || _users.isEmpty) {
+      return;
+    }
+
+    var changed = false;
+    final next = _users.map((item) {
+      if ((item.username ?? '').trim() != username) {
+        return item;
+      }
+
+      changed = true;
+      return profile;
+    }).toList();
+
+    if (!changed) {
+      return;
+    }
+
+    _users = next;
+    notifyListeners();
+  }
 }

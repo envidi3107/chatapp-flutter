@@ -33,8 +33,7 @@ class MessageBubble extends StatelessWidget {
   final List<SeenAvatarInfo> seenByAvatars;
 
   String _seenTooltip(SeenAvatarInfo info) {
-    final username = (info.user.username ?? '').trim();
-    final name = username.isEmpty ? 'Unknown user' : username;
+    final name = info.user.displayLabel;
     final seenAt = info.seenAt;
     if (seenAt == null) {
       return '$name\nĐã xem';
@@ -186,7 +185,7 @@ class MessageBubble extends StatelessWidget {
                         waitDuration: const Duration(milliseconds: 180),
                         child: AppAvatar(
                           url: viewer.user.avatar?.source,
-                          name: viewer.user.username ?? '?',
+                          name: viewer.user.displayLabel,
                           radius: 7,
                         ),
                       ),

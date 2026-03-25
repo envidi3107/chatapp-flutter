@@ -77,6 +77,7 @@ List<SingleChildWidget> createAppProviders({
         authService: authService,
         realtimeService: realtimeService,
         tokenStorage: tokenStorage,
+        userService: userService,
       ),
     ),
     ChangeNotifierProvider(

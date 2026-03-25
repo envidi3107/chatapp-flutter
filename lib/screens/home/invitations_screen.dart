@@ -70,7 +70,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
               itemCount: provider.items.length,
               itemBuilder: (context, index) {
                 final item = provider.items[index];
-                final senderName = item.sender?.username ?? 'Unknown';
+                final senderName = item.sender?.displayLabel ?? 'Unknown';
 
                 return Card(
                   margin:

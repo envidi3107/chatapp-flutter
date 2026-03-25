@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/invitation_model.dart';
+import '../models/user_with_avatar_model.dart';
 import '../services/invitation_service.dart';
 import '../services/realtime_service.dart';
 
@@ -14,6 +15,7 @@ class InvitationProvider extends ChangeNotifier {
 
   StreamSubscription<InvitationModel>? _invitationSub;
   StreamSubscription<InvitationReplyEvent>? _invitationReplySub;
+  StreamSubscription<UserWithAvatarModel>? _profileSub;
 
   bool _isLoading = false;
   String? _error;
@@ -40,6 +42,10 @@ class InvitationProvider extends ChangeNotifier {
       }
       loadInvitations();
     });
+
+    _profileSub ??= _realtimeService.profileStream.listen((profile) {
+      applyUserProfileUpdate(profile);
+    });
   }
 
   void stopRealtime() {
@@ -48,6 +54,9 @@ class InvitationProvider extends ChangeNotifier {
 
     _invitationReplySub?.cancel();
     _invitationReplySub = null;
+
+    _profileSub?.cancel();
+    _profileSub = null;
   }
 
   Future<void> loadInvitations() async {
@@ -79,6 +88,42 @@ class InvitationProvider extends ChangeNotifier {
       _error = e.toString();
       notifyListeners();
     }
+  }
+
+  void applyUserProfileUpdate(UserWithAvatarModel profile) {
+    final username = (profile.username ?? '').trim();
+    if (username.isEmpty || _items.isEmpty) {
+      return;
+    }
+
+    var changed = false;
+    final next = _items.map((item) {
+      final sender = item.sender;
+      final receiver = item.receiver;
+
+      final nextSender = (sender?.username ?? '').trim() == username ? profile : sender;
+      final nextReceiver = (receiver?.username ?? '').trim() == username ? profile : receiver;
+
+      if (nextSender == sender && nextReceiver == receiver) {
+        return item;
+      }
+
+      changed = true;
+      return InvitationModel(
+        id: item.id,
+        sender: nextSender,
+        receiver: nextReceiver,
+        chatRoomId: item.chatRoomId,
+        status: item.status,
+      );
+    }).toList();
+
+    if (!changed) {
+      return;
+    }
+
+    _items = next;
+    notifyListeners();
   }
 
   @override

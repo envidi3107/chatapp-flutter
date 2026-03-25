@@ -71,6 +71,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   ChatRoomsProvider? _chatRoomsProvider;
   ChatProvider? _chatProvider;
   StreamSubscription<PresenceUpdateEvent>? _presenceSub;
+  StreamSubscription<UserWithAvatarModel>? _profileSub;
   StreamSubscription<TypingStatusEvent>? _typingSub;
   StreamSubscription<ReadStatusEvent>? _readSub;
   Timer? _typingDebounce;
@@ -87,6 +88,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   bool _isPresenceLoading = false;
   bool? _isPeerOnline;
   DateTime? _lastSeenAt;
+  late String _roomDisplayName;
   int? _lastSyncedMessageId;
   bool _didInitialAutoScroll = false;
 
@@ -95,6 +97,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _myUsername = context.read<AuthProvider>().username;
+    _roomDisplayName = widget.roomName;
     _chatProvider = context.read<ChatProvider>();
     _chatProvider?.addListener(_onChatUpdated);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -106,6 +109,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
 
     _loadPresence();
     _subscribePresence();
+    _subscribeProfile();
     _subscribeTyping();
     _subscribeReadStatus();
   }
@@ -123,6 +127,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
       unawaited(context.read<ChatProvider>().setTypingStatus(false));
     }
     _presenceSub?.cancel();
+    _profileSub?.cancel();
     _typingSub?.cancel();
     _readSub?.cancel();
     _controller.dispose();
@@ -271,11 +276,11 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   String _typingDisplayName() {
     final sender = _typingSender;
     if (sender == null || sender.isEmpty) {
-      return widget.roomName;
+      return _roomDisplayName;
     }
 
     if (widget.peerUsername != null && sender == widget.peerUsername) {
-      return widget.roomName;
+      return _roomDisplayName;
     }
 
     return sender;
@@ -361,6 +366,24 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
       setState(() {
         _isPeerOnline = presence.online;
         _lastSeenAt = presence.lastSeenAt?.toLocal();
+      });
+    });
+  }
+
+  void _subscribeProfile() {
+    final peer = widget.peerUsername;
+    if (peer == null || peer.isEmpty) {
+      return;
+    }
+
+    _profileSub = context.read<RealtimeService>().profileStream.listen((profile) {
+      final username = (profile.username ?? '').trim();
+      if (!mounted || username != peer) {
+        return;
+      }
+
+      setState(() {
+        _roomDisplayName = profile.displayLabel;
       });
     });
   }
@@ -546,6 +569,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
           UserWithAvatarModel(
             id: null,
             username: username,
+            displayName: username,
             avatar: null,
           );
 
@@ -580,6 +604,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
           UserWithAvatarModel(
             id: null,
             username: username,
+            displayName: username,
             avatar: null,
           );
 
@@ -617,7 +642,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.roomName,
+                    _roomDisplayName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
