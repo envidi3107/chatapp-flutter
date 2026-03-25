@@ -5,6 +5,7 @@ import 'app.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
 import 'services/chat_room_service.dart';
+import 'services/group_chat_service.dart';
 import 'services/invitation_service.dart';
 import 'services/message_service.dart';
 import 'services/realtime_service.dart';
@@ -18,6 +19,7 @@ void main() {
 
   final authService = AuthService(apiClient);
   final chatRoomService = ChatRoomService(apiClient);
+  final groupChatService = GroupChatService(apiClient);
   final messageService = MessageService(apiClient);
   final invitationService = InvitationService(apiClient);
   final userService = UserService(apiClient);
@@ -29,6 +31,7 @@ void main() {
       providers: createAppProviders(
         authService: authService,
         chatRoomService: chatRoomService,
+        groupChatService: groupChatService,
         userService: userService,
         invitationService: invitationService,
         messageService: messageService,

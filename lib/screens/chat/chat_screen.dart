@@ -604,16 +604,33 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     final presenceLabel = _presenceLabel();
     final blockedBannerText = _blockedBannerText();
     final typingLabel = _isPeerTyping
-      ? '${_typingDisplayName()} đang nhập${'.' * _typingDots}'
-      : null;
+        ? '${_typingDisplayName()} \u0111ang nh\u1eadp${'.' * _typingDots}'
+        : null;
     final isOnline = _isPeerOnline == true;
     final messages = chat.messages;
+    final isGroupRoom = widget.peerUsername == null || widget.peerUsername!.isEmpty;
+
+    final senderProfiles = <String, UserWithAvatarModel>{};
+    for (final item in messages) {
+      final username = (item.sender ?? item.senderProfile?.username ?? '').trim();
+      if (username.isEmpty) {
+        continue;
+      }
+
+      final profile = item.senderProfile;
+      if (profile != null) {
+        senderProfiles[username] = profile;
+      } else if (_readerByUsername.containsKey(username)) {
+        senderProfiles[username] = _readerByUsername[username]!;
+      }
+    }
 
     int? lastOwnIndex;
     final ownMessageIndexes = <int>[];
     for (var i = 0; i < messages.length; i++) {
       final item = messages[i];
-      if (myUsername != null && item.sender == myUsername) {
+      final senderUsername = (item.sender ?? item.senderProfile?.username ?? '').trim();
+      if (myUsername != null && senderUsername == myUsername) {
         ownMessageIndexes.add(i);
       }
     }
@@ -770,15 +787,38 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
                     itemCount: chat.messages.length,
                     itemBuilder: (context, index) {
                       final item = messages[index];
-                      final isMine =
-                          myUsername != null && item.sender == myUsername;
+                      final senderUsername =
+                          (item.sender ?? item.senderProfile?.username ?? '').trim();
+                      final isMine = myUsername != null && senderUsername == myUsername;
+                      final senderProfile = senderProfiles[senderUsername];
 
-                      final seenByAvatars =
-                          isMine ? (seenByAvatarsByIndex[index] ?? const <SeenAvatarInfo>[]) : const <SeenAvatarInfo>[];
+                      final previousSender = index > 0
+                          ? (messages[index - 1].sender ??
+                                  messages[index - 1].senderProfile?.username ??
+                                  '')
+                              .trim()
+                          : '';
+                      final nextSender = index + 1 < messages.length
+                          ? (messages[index + 1].sender ??
+                                  messages[index + 1].senderProfile?.username ??
+                                  '')
+                              .trim()
+                          : '';
+                      final isStartSenderBlock = senderUsername != previousSender;
+                      final isEndSenderBlock = senderUsername != nextSender;
+                      final bubbleTopSpacing = isStartSenderBlock
+                          ? (index == 0 ? 4.0 : 14.0)
+                          : 3.0;
+
+                      final seenByAvatars = isMine
+                          ? (seenByAvatarsByIndex[index] ?? const <SeenAvatarInfo>[])
+                          : const <SeenAvatarInfo>[];
 
                       String? deliveryStatus;
                       if (isMine && index == lastOwnIndex) {
-                        deliveryStatus = seenByAvatars.isNotEmpty ? 'Đã xem' : 'Đã gửi';
+                        deliveryStatus = seenByAvatars.isNotEmpty
+                            ? '\u0110\u00e3 xem'
+                            : '\u0110\u00e3 g\u1eedi';
                       }
 
                       return MessageBubble(
@@ -786,6 +826,12 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
                         isMine: isMine,
                         deliveryStatus: deliveryStatus,
                         seenByAvatars: seenByAvatars,
+                        senderName: senderProfile?.displayLabel ?? senderUsername,
+                        senderAvatarUrl: senderProfile?.avatar?.source,
+                        showSenderName: !isMine && isGroupRoom && isStartSenderBlock,
+                        showSenderAvatar: !isMine && (!isGroupRoom || isEndSenderBlock),
+                        reserveSenderAvatarSpace: !isMine && isGroupRoom,
+                        topSpacing: bubbleTopSpacing,
                         onLongPress: () {
                           if (item.id != null && isMine) {
                             _confirmRecall(item.id!);

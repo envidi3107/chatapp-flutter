@@ -30,6 +30,7 @@ class ChatRoomsProvider extends ChangeNotifier {
       {};
   StreamSubscription<InvitationReplyEvent>? _invitationReplySub;
   StreamSubscription<FriendRemovedEvent>? _friendRemovedSub;
+  StreamSubscription<ChatRoomCreatedEvent>? _chatRoomCreatedSub;
   StreamSubscription<PresenceUpdateEvent>? _presenceSub;
   StreamSubscription<UserWithAvatarModel>? _profileSub;
   final Map<int, int> _unreadCounts = {};
@@ -48,6 +49,25 @@ class ChatRoomsProvider extends ChangeNotifier {
 
   int unreadCountFor(int roomId) => _unreadCounts[roomId] ?? 0;
   bool isPeerOnlineFor(int roomId) => _roomPeerOnline[roomId] ?? false;
+
+  void upsertRoom(ChatRoomModel room) {
+    final index = _rooms.indexWhere((item) => item.id == room.id);
+    if (index < 0) {
+      _rooms = _sortRooms([room, ..._rooms]);
+    } else {
+      final next = [..._rooms];
+      next[index] = room;
+      _rooms = _sortRooms(next);
+    }
+
+    _unreadCounts.putIfAbsent(room.id, () => 0);
+    if (room.type != ChatRoomType.duo) {
+      _roomPeerOnline[room.id] = false;
+    }
+
+    unawaited(_ensureRealtimeSubscriptions());
+    notifyListeners();
+  }
 
   void setCurrentUsername(String? username) {
     if (_currentUsername == username) {
@@ -156,6 +176,15 @@ class ChatRoomsProvider extends ChangeNotifier {
       notifyListeners();
     });
 
+    _chatRoomCreatedSub ??=
+        _realtimeService.chatRoomCreatedStream.listen((event) {
+      final room = event.chatRoom;
+      if (room == null) {
+        return;
+      }
+      upsertRoom(room);
+    });
+
     _presenceSub ??= _realtimeService.presenceStream.listen((event) {
       final presence = event.presence;
       final username = presence?.username ?? '';
@@ -197,6 +226,9 @@ class ChatRoomsProvider extends ChangeNotifier {
 
     _friendRemovedSub?.cancel();
     _friendRemovedSub = null;
+
+    _chatRoomCreatedSub?.cancel();
+    _chatRoomCreatedSub = null;
 
     _presenceSub?.cancel();
     _presenceSub = null;

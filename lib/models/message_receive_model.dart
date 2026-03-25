@@ -5,6 +5,7 @@ class MessageReceiveModel {
   const MessageReceiveModel({
     required this.id,
     required this.sender,
+    required this.senderProfile,
     required this.message,
     required this.sentOn,
     required this.attachments,
@@ -13,17 +14,28 @@ class MessageReceiveModel {
 
   final int? id;
   final String? sender;
+  final UserWithAvatarModel? senderProfile;
   final String? message;
   final DateTime? sentOn;
   final List<AttachmentModel> attachments;
   final List<UserWithAvatarModel> seenBy;
 
   factory MessageReceiveModel.fromJson(Map<String, dynamic> json) {
+    final senderRaw = json['sender'];
+    final senderProfileJson =
+        json['senderProfile'] ?? (senderRaw is Map<String, dynamic> ? senderRaw : null);
+    final senderProfile = senderProfileJson is Map<String, dynamic>
+        ? UserWithAvatarModel.fromJson(senderProfileJson)
+        : null;
+    final sender = senderRaw is String
+        ? senderRaw
+        : (senderRaw is Map<String, dynamic> ? senderRaw['username']?.toString() : null);
     final attachmentsRaw = json['attachments'] as List<dynamic>? ?? const [];
     final seenByRaw = json['seenBy'] as List<dynamic>? ?? const [];
     return MessageReceiveModel(
       id: json['id'] as int?,
-      sender: json['sender'] as String?,
+      sender: (sender ?? senderProfile?.username)?.toString(),
+      senderProfile: senderProfile,
       message: json['message'] as String?,
       sentOn: DateTime.tryParse((json['sentOn'] ?? '').toString()),
       attachments: attachmentsRaw

@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/chat_room_model.dart';
 import '../../models/user_with_avatar_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_rooms_provider.dart';
-import '../../services/invitation_service.dart';
+import '../../services/group_chat_service.dart';
 import '../../services/user_service.dart';
 import '../../widgets/app_avatar.dart';
+import '../chat/chat_screen.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
@@ -19,17 +19,18 @@ class CreateGroupScreen extends StatefulWidget {
 }
 
 class _CreateGroupScreenState extends State<CreateGroupScreen> {
+  final _groupNameController = TextEditingController();
   final _searchController = TextEditingController();
-  final Set<String> _selectedUsernames = {};
+  final Map<int, UserWithAvatarModel> _selectedUsersById = {};
 
   Timer? _debounce;
   List<UserWithAvatarModel> _searchResults = const [];
   bool _isSearching = false;
   bool _isSubmitting = false;
-  int? _baseRoomId;
 
   @override
   void dispose() {
+    _groupNameController.dispose();
     _searchController.dispose();
     _debounce?.cancel();
     super.dispose();
@@ -44,7 +45,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   Future<void> _searchUsers(String query) async {
     final userService = context.read<UserService>();
-    final roomsProvider = context.read<ChatRoomsProvider>();
     final authProvider = context.read<AuthProvider>();
 
     final trimmed = query.trim();
@@ -61,27 +61,14 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
     try {
       final users = await userService.searchUsers(query: trimmed);
-      final rooms = roomsProvider.rooms;
-      ChatRoomModel? selectedBaseRoom;
-      for (final room in rooms) {
-        if (room.id == _baseRoomId) {
-          selectedBaseRoom = room;
-          break;
-        }
-      }
-
       final currentUsername = authProvider.username;
-      final memberSet = {
-        ...?selectedBaseRoom?.membersUsername,
-        if (currentUsername != null) currentUsername,
-      };
-
       final filtered = users.where((user) {
+        final id = user.id;
         final username = user.username;
-        if (username == null || username.isEmpty) {
+        if (id == null || username == null || username.isEmpty) {
           return false;
         }
-        return !memberSet.contains(username);
+        return username != currentUsername;
       }).toList();
 
       if (!mounted) {
@@ -100,9 +87,17 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   }
 
   Future<void> _createGroup() async {
-    if (_baseRoomId == null || _selectedUsernames.isEmpty) {
+    final groupName = _groupNameController.text.trim();
+    if (groupName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select base room and members')),
+        const SnackBar(content: Text('Please enter a group name')),
+      );
+      return;
+    }
+
+    if (_selectedUsersById.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least 2 members')),
       );
       return;
     }
@@ -111,53 +106,66 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       _isSubmitting = true;
     });
 
-    final invitationService = context.read<InvitationService>();
-    final failed = <String>[];
+    try {
+      final dto = await context.read<GroupChatService>().createGroup(
+            name: groupName,
+            memberIds: _selectedUsersById.keys.toList(),
+          );
 
-    for (final username in _selectedUsernames) {
-      try {
-        await invitationService.sendInvitation(
-          receiverUserName: username,
-          chatGroupId: _baseRoomId,
-        );
-      } catch (_) {
-        failed.add(username);
+      final room = dto.toChatRoomModel();
+      context.read<ChatRoomsProvider>().upsertRoom(room);
+
+      if (!mounted) {
+        return;
+      }
+
+      final currentUsername = context.read<AuthProvider>().username;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            roomId: room.id,
+            roomName: room.displayNameFor(currentUsername),
+            peerUsername: null,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Create group failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
       }
     }
+  }
 
-    if (!mounted) {
+  void _toggleUser(UserWithAvatarModel user) {
+    final id = user.id;
+    if (id == null) {
       return;
     }
 
     setState(() {
-      _isSubmitting = false;
+      if (_selectedUsersById.containsKey(id)) {
+        _selectedUsersById.remove(id);
+      } else {
+        _selectedUsersById[id] = user;
+      }
     });
-
-    if (failed.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invitations sent. Group will appear when users accept.'),
-        ),
-      );
-      Navigator.pop(context, true);
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Some invitations failed: ${failed.join(', ')}'),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final chatRoomsProvider = context.watch<ChatRoomsProvider>();
-    final currentUsername = context.watch<AuthProvider>().username;
-
-    final baseRooms = chatRoomsProvider.rooms
-        .where((room) => room.type == ChatRoomType.duo)
-        .toList();
+    final hasQuery = _searchController.text.trim().isNotEmpty;
+    final selectedUsers = _selectedUsersById.values.toList()
+      ..sort((a, b) => a.displayLabel.compareTo(b.displayLabel));
 
     return Scaffold(
       appBar: AppBar(
@@ -166,26 +174,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-            child: DropdownButtonFormField<int>(
-              value: _baseRoomId,
-              items: baseRooms
-                  .map(
-                    (room) => DropdownMenuItem<int>(
-                      value: room.id,
-                      child: Text(room.displayNameFor(currentUsername)),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                setState(() {
-                  _baseRoomId = value;
-                  _selectedUsernames.clear();
-                });
-                _searchUsers(_searchController.text);
-              },
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+            child: TextField(
+              controller: _groupNameController,
+              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
-                labelText: 'Base chat (DUO)',
+                labelText: 'Group name',
+                hintText: 'Enter group name',
               ),
             ),
           ),
@@ -200,26 +195,42 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+            child: Row(
+              children: [
+                Text(
+                  'Selected: ${_selectedUsersById.length}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Minimum 2 members',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.black54,
+                      ),
+                ),
+              ],
+            ),
+          ),
           if (_isSearching)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 14),
               child: LinearProgressIndicator(minHeight: 2),
             ),
-          if (_selectedUsernames.isNotEmpty)
+          if (selectedUsers.isNotEmpty)
             Container(
               width: double.infinity,
               margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
               child: Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: _selectedUsernames
+                children: selectedUsers
                     .map(
-                      (username) => InputChip(
-                        label: Text(username),
+                      (user) => InputChip(
+                        label: Text(user.displayLabel),
                         onDeleted: () {
-                          setState(() {
-                            _selectedUsernames.remove(username);
-                          });
+                          _toggleUser(user);
                         },
                       ),
                     )
@@ -228,42 +239,44 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             ),
           const SizedBox(height: 6),
           Expanded(
-            child: ListView.builder(
-              itemCount: _searchResults.length,
-              itemBuilder: (context, index) {
-                final user = _searchResults[index];
-                final username = user.username;
-                final selected =
-                    username != null && _selectedUsernames.contains(username);
+            child: !hasQuery
+                ? const Center(
+                    child: Text('Search users to add members'),
+                  )
+                : _searchResults.isEmpty && !_isSearching
+                    ? const Center(
+                        child: Text('No users found'),
+                      )
+                    : ListView.builder(
+                        itemCount: _searchResults.length,
+                        itemBuilder: (context, index) {
+                          final user = _searchResults[index];
+                          final id = user.id;
+                          final selected =
+                              id != null && _selectedUsersById.containsKey(id);
 
-                return ListTile(
-                  leading: AppAvatar(
-                    url: user.avatar?.source,
-                    name: username ?? 'U',
-                  ),
-                  title: Text(username ?? 'Unknown user'),
-                  trailing: IconButton(
-                    onPressed: username == null
-                        ? null
-                        : () {
-                            setState(() {
-                              if (selected) {
-                                _selectedUsernames.remove(username);
-                              } else {
-                                _selectedUsernames.add(username);
-                              }
-                            });
-                          },
-                    icon: Icon(
-                      selected
-                          ? Icons.check_circle
-                          : Icons.add_circle_outline_rounded,
-                      color: selected ? const Color(0xFF168AFF) : null,
-                    ),
-                  ),
-                );
-              },
-            ),
+                          return ListTile(
+                            leading: AppAvatar(
+                              url: user.avatar?.source,
+                              name: user.displayLabel,
+                            ),
+                            title: Text(user.displayLabel),
+                            subtitle: user.displayName != null &&
+                                    user.displayName!.trim().isNotEmpty &&
+                                    user.username != null &&
+                                    user.username!.trim().isNotEmpty
+                                ? Text('@${user.username!}')
+                                : null,
+                            trailing: Icon(
+                              selected
+                                  ? Icons.check_circle
+                                  : Icons.add_circle_outline_rounded,
+                              color: selected ? const Color(0xFF168AFF) : null,
+                            ),
+                            onTap: id == null ? null : () => _toggleUser(user),
+                          );
+                        },
+                      ),
           ),
           SafeArea(
             top: false,
@@ -280,7 +293,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Send invitations to create group'),
+                    : const Text('Create group chat'),
               ),
             ),
           ),

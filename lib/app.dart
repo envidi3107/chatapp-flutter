@@ -11,6 +11,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'services/auth_service.dart';
 import 'services/chat_room_service.dart';
+import 'services/group_chat_service.dart';
 import 'services/invitation_service.dart';
 import 'services/message_service.dart';
 import 'services/realtime_service.dart';
@@ -56,6 +57,7 @@ class _MessengerAppState extends State<MessengerApp> {
 List<SingleChildWidget> createAppProviders({
   required AuthService authService,
   required ChatRoomService chatRoomService,
+  required GroupChatService groupChatService,
   required UserService userService,
   required InvitationService invitationService,
   required MessageService messageService,
@@ -66,6 +68,7 @@ List<SingleChildWidget> createAppProviders({
   return [
     Provider.value(value: authService),
     Provider.value(value: chatRoomService),
+    Provider.value(value: groupChatService),
     Provider.value(value: userService),
     Provider.value(value: invitationService),
     Provider.value(value: messageService),

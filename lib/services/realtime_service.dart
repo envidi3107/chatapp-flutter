@@ -44,6 +44,21 @@ class FriendRemovedEvent {
   }
 }
 
+class ChatRoomCreatedEvent {
+  const ChatRoomCreatedEvent({required this.chatRoom});
+
+  final ChatRoomModel? chatRoom;
+
+  factory ChatRoomCreatedEvent.fromJson(Map<String, dynamic> json) {
+    final roomJson = json['chatRoom'] ?? json['room'] ?? json['chatRoomDto'];
+    return ChatRoomCreatedEvent(
+      chatRoom: roomJson is Map<String, dynamic>
+          ? ChatRoomModel.fromJson(roomJson)
+          : null,
+    );
+  }
+}
+
 class PresenceUpdateEvent {
   const PresenceUpdateEvent({required this.presence});
 
@@ -119,12 +134,14 @@ class RealtimeService {
       StreamController<InvitationReplyEvent>.broadcast();
   final StreamController<FriendRemovedEvent> _friendRemovedController =
       StreamController<FriendRemovedEvent>.broadcast();
+  final StreamController<ChatRoomCreatedEvent> _chatRoomCreatedController =
+      StreamController<ChatRoomCreatedEvent>.broadcast();
   final StreamController<PresenceUpdateEvent> _presenceController =
       StreamController<PresenceUpdateEvent>.broadcast();
-    final StreamController<UserWithAvatarModel> _profileController =
+  final StreamController<UserWithAvatarModel> _profileController =
       StreamController<UserWithAvatarModel>.broadcast();
-      final StreamController<UserBlockStatusModel> _blockStatusController =
-        StreamController<UserBlockStatusModel>.broadcast();
+  final StreamController<UserBlockStatusModel> _blockStatusController =
+      StreamController<UserBlockStatusModel>.broadcast();
   final Map<int, StreamController<MessageReceiveModel>> _roomControllers = {};
   final Map<int, StreamController<TypingStatusEvent>> _typingControllers = {};
   final Map<int, StreamController<ReadStatusEvent>> _readControllers = {};
@@ -138,6 +155,8 @@ class RealtimeService {
 
   Stream<FriendRemovedEvent> get friendRemovedStream =>
       _friendRemovedController.stream;
+  Stream<ChatRoomCreatedEvent> get chatRoomCreatedStream =>
+      _chatRoomCreatedController.stream;
 
   Stream<PresenceUpdateEvent> get presenceStream => _presenceController.stream;
   Stream<UserWithAvatarModel> get profileStream => _profileController.stream;
@@ -219,6 +238,7 @@ class RealtimeService {
           _subscribeInvitations();
           _subscribeInvitationReplies();
           _subscribeFriendRemoved();
+          _subscribeChatRoomCreated();
           _subscribePresence();
           _subscribeProfileUpdates();
           _subscribeBlockStatusUpdates();
@@ -269,6 +289,7 @@ class RealtimeService {
     _invitationController.close();
     _invitationReplyController.close();
     _friendRemovedController.close();
+    _chatRoomCreatedController.close();
     _presenceController.close();
     _profileController.close();
     _blockStatusController.close();
@@ -377,6 +398,31 @@ class RealtimeService {
         }
 
         _friendRemovedController.add(FriendRemovedEvent.fromJson(decoded));
+      },
+    );
+  }
+
+  void _subscribeChatRoomCreated() {
+    _client?.subscribe(
+      destination: '/user/queue/chatrooms/created/',
+      callback: (frame) {
+        final body = frame.body;
+        if (body == null || body.isEmpty) {
+          _chatRoomCreatedController.add(
+            const ChatRoomCreatedEvent(chatRoom: null),
+          );
+          return;
+        }
+
+        final decoded = jsonDecode(body);
+        if (decoded is! Map<String, dynamic>) {
+          _chatRoomCreatedController.add(
+            const ChatRoomCreatedEvent(chatRoom: null),
+          );
+          return;
+        }
+
+        _chatRoomCreatedController.add(ChatRoomCreatedEvent.fromJson(decoded));
       },
     );
   }
