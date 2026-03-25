@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/chat_rooms_provider.dart';
+import '../../models/user_block_status_model.dart';
 import '../../models/user_with_avatar_model.dart';
 import '../../services/message_service.dart';
 import '../../services/realtime_service.dart';
@@ -72,6 +73,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   ChatProvider? _chatProvider;
   StreamSubscription<PresenceUpdateEvent>? _presenceSub;
   StreamSubscription<UserWithAvatarModel>? _profileSub;
+  StreamSubscription<UserBlockStatusModel>? _blockStatusSub;
   StreamSubscription<TypingStatusEvent>? _typingSub;
   StreamSubscription<ReadStatusEvent>? _readSub;
   Timer? _typingDebounce;
@@ -86,6 +88,9 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   final Map<String, DateTime> _readAtByUser = {};
   final Map<String, UserWithAvatarModel> _readerByUsername = {};
   bool _isPresenceLoading = false;
+  bool _isBlockStatusLoading = false;
+  bool _blockedByMe = false;
+  bool _blockedByPeer = false;
   bool? _isPeerOnline;
   DateTime? _lastSeenAt;
   late String _roomDisplayName;
@@ -108,8 +113,10 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     });
 
     _loadPresence();
+    _loadBlockStatus();
     _subscribePresence();
     _subscribeProfile();
+    _subscribeBlockStatus();
     _subscribeTyping();
     _subscribeReadStatus();
   }
@@ -128,6 +135,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     }
     _presenceSub?.cancel();
     _profileSub?.cancel();
+    _blockStatusSub?.cancel();
     _typingSub?.cancel();
     _readSub?.cancel();
     _controller.dispose();
@@ -388,7 +396,80 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> _loadBlockStatus() async {
+    final peer = widget.peerUsername;
+    if (peer == null || peer.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isBlockStatusLoading = true;
+    });
+
+    try {
+      final status = await context.read<UserService>().getBlockStatus(peer);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _blockedByMe = status.blockedByMe;
+        _blockedByPeer = status.blockedByUser;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBlockStatusLoading = false;
+        });
+      }
+    }
+  }
+
+  void _subscribeBlockStatus() {
+    final peer = widget.peerUsername;
+    if (peer == null || peer.isEmpty) {
+      return;
+    }
+
+    _blockStatusSub = context.read<RealtimeService>().blockStatusStream.listen((event) {
+      if (!mounted || event.username != peer) {
+        return;
+      }
+
+      setState(() {
+        _blockedByMe = event.blockedByMe;
+        _blockedByPeer = event.blockedByUser;
+      });
+    });
+  }
+
+  bool get _isMessagingBlocked => _blockedByMe || _blockedByPeer;
+
+  String? _blockedBannerText() {
+    if (!_isMessagingBlocked) {
+      return null;
+    }
+
+    if (_blockedByMe && _blockedByPeer) {
+      return 'Both users blocked each other. Unblock to continue messaging.';
+    }
+
+    if (_blockedByMe) {
+      return 'You blocked this user. Unblock in People tab to continue messaging.';
+    }
+
+    return 'This user blocked you on Messenger.';
+  }
+
   String? _presenceLabel() {
+    if (_isMessagingBlocked) {
+      return 'Blocked';
+    }
+
     if (widget.peerUsername == null || widget.peerUsername!.isEmpty) {
       return null;
     }
@@ -430,6 +511,10 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }
 
   Future<void> _pickImage() async {
+    if (_isMessagingBlocked) {
+      return;
+    }
+
     final image = await _picker.pickImage(source: ImageSource.gallery);
     if (image == null) {
       return;
@@ -441,6 +526,10 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }
 
   Future<void> _send() async {
+    if (_isMessagingBlocked) {
+      return;
+    }
+
     final text = _controller.text.trim();
     if (text.isEmpty && _pickedFiles.isEmpty) {
       return;
@@ -513,6 +602,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     final chat = context.watch<ChatProvider>();
     final myUsername = context.watch<AuthProvider>().username;
     final presenceLabel = _presenceLabel();
+    final blockedBannerText = _blockedBannerText();
     final typingLabel = _isPeerTyping
       ? '${_typingDisplayName()} đang nhập${'.' * _typingDots}'
       : null;
@@ -755,6 +845,23 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
                 },
               ),
             ),
+          if (_isBlockStatusLoading)
+            const LinearProgressIndicator(minHeight: 2),
+          if (blockedBannerText != null)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(10, 6, 10, 2),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF4E5),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFFD08A)),
+              ),
+              child: Text(
+                blockedBannerText,
+                style: const TextStyle(color: Color(0xFF7A4A00), fontSize: 13),
+              ),
+            ),
           AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             height: typingLabel == null ? 0 : 22,
@@ -778,13 +885,14 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: _pickImage,
+                    onPressed: _isMessagingBlocked ? null : _pickImage,
                     icon: const Icon(Icons.image_rounded),
                     color: const Color(0xFF168AFF),
                   ),
                   Expanded(
                     child: TextField(
                       controller: _controller,
+                      enabled: !_isMessagingBlocked,
                       textInputAction: TextInputAction.send,
                       minLines: 1,
                       maxLines: 5,
@@ -800,7 +908,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
                   ),
                   const SizedBox(width: 6),
                   IconButton.filled(
-                    onPressed: chat.isSending ? null : _send,
+                    onPressed: chat.isSending || _isMessagingBlocked ? null : _send,
                     style: IconButton.styleFrom(
                       backgroundColor: const Color(0xFF168AFF),
                     ),

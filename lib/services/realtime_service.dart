@@ -7,6 +7,7 @@ import '../core/app_constants.dart';
 import '../models/chat_room_model.dart';
 import '../models/invitation_model.dart';
 import '../models/message_receive_model.dart';
+import '../models/user_block_status_model.dart';
 import '../models/user_with_avatar_model.dart';
 import '../models/user_presence_model.dart';
 import 'token_storage_service.dart';
@@ -122,6 +123,8 @@ class RealtimeService {
       StreamController<PresenceUpdateEvent>.broadcast();
     final StreamController<UserWithAvatarModel> _profileController =
       StreamController<UserWithAvatarModel>.broadcast();
+      final StreamController<UserBlockStatusModel> _blockStatusController =
+        StreamController<UserBlockStatusModel>.broadcast();
   final Map<int, StreamController<MessageReceiveModel>> _roomControllers = {};
   final Map<int, StreamController<TypingStatusEvent>> _typingControllers = {};
   final Map<int, StreamController<ReadStatusEvent>> _readControllers = {};
@@ -138,6 +141,7 @@ class RealtimeService {
 
   Stream<PresenceUpdateEvent> get presenceStream => _presenceController.stream;
   Stream<UserWithAvatarModel> get profileStream => _profileController.stream;
+  Stream<UserBlockStatusModel> get blockStatusStream => _blockStatusController.stream;
 
   Stream<MessageReceiveModel> roomMessageStream(int roomId) {
     _requestedRooms.add(roomId);
@@ -217,6 +221,7 @@ class RealtimeService {
           _subscribeFriendRemoved();
           _subscribePresence();
           _subscribeProfileUpdates();
+          _subscribeBlockStatusUpdates();
           for (final roomId in _requestedRooms) {
             _subscribeRoom(roomId);
             _subscribeTyping(roomId);
@@ -266,6 +271,7 @@ class RealtimeService {
     _friendRemovedController.close();
     _presenceController.close();
     _profileController.close();
+    _blockStatusController.close();
     for (final controller in _roomControllers.values) {
       controller.close();
     }
@@ -469,6 +475,25 @@ class RealtimeService {
         }
 
         _profileController.add(UserWithAvatarModel.fromJson(decoded));
+      },
+    );
+  }
+
+  void _subscribeBlockStatusUpdates() {
+    _client?.subscribe(
+      destination: '/user/queue/users/block/',
+      callback: (frame) {
+        final body = frame.body;
+        if (body == null || body.isEmpty) {
+          return;
+        }
+
+        final decoded = jsonDecode(body);
+        if (decoded is! Map<String, dynamic>) {
+          return;
+        }
+
+        _blockStatusController.add(UserBlockStatusModel.fromJson(decoded));
       },
     );
   }

@@ -9,6 +9,7 @@ import '../../providers/chat_rooms_provider.dart';
 import '../../providers/user_search_provider.dart';
 import '../../services/chat_room_service.dart';
 import '../../services/invitation_service.dart';
+import '../../services/user_service.dart';
 import '../../widgets/app_avatar.dart';
 
 class PeopleScreen extends StatefulWidget {
@@ -21,6 +22,17 @@ class PeopleScreen extends StatefulWidget {
 class _PeopleScreenState extends State<PeopleScreen> {
   final _searchController = TextEditingController();
   Timer? _debounce;
+  bool _isLoadingBlocked = false;
+  Set<String> _blockedUsernames = {};
+  List<String> _blockedDisplayNames = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadBlockedUsers();
+    });
+  }
 
   Future<void> _removeFriend(ChatRoomModel room) async {
     final confirmed = await showDialog<bool>(
@@ -77,6 +89,96 @@ class _PeopleScreenState extends State<PeopleScreen> {
     _searchController.dispose();
     _debounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadBlockedUsers() async {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingBlocked = true;
+    });
+
+    try {
+      final blocked = await context.read<UserService>().listBlockedUsers();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _blockedUsernames = blocked
+            .map((item) => (item.username ?? '').trim())
+            .where((item) => item.isNotEmpty)
+            .toSet();
+        _blockedDisplayNames = blocked
+            .map((item) => item.displayLabel)
+            .where((item) => item.trim().isNotEmpty)
+            .toList();
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingBlocked = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _blockUser(String username) async {
+    final userService = context.read<UserService>();
+    final roomsProvider = context.read<ChatRoomsProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await userService.blockUser(username);
+      await _loadBlockedUsers();
+      await roomsProvider.loadRooms();
+      if (!mounted) {
+        return;
+      }
+
+      messenger.showSnackBar(
+        SnackBar(content: Text('Blocked @$username')),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      messenger.showSnackBar(
+        SnackBar(content: Text('Block user failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _unblockUser(String username) async {
+    final userService = context.read<UserService>();
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await userService.unblockUser(username);
+      await _loadBlockedUsers();
+      if (!mounted) {
+        return;
+      }
+
+      messenger.showSnackBar(
+        SnackBar(content: Text('Unblocked @$username')),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      messenger.showSnackBar(
+        SnackBar(content: Text('Unblock user failed: $e')),
+      );
+    }
   }
 
   void _onSearchChanged(String value) {
@@ -239,6 +341,8 @@ class _PeopleScreenState extends State<PeopleScreen> {
                 ),
                 ...friends.map((room) {
                   final friendName = room.displayNameFor(currentUsername);
+                  final peerUsername = room.duoPeerFor(currentUsername) ?? '';
+                  final isBlocked = _blockedUsernames.contains(peerUsername);
                   return ListTile(
                     leading: AppAvatar(
                       url: room.avatar?.source,
@@ -250,13 +354,59 @@ class _PeopleScreenState extends State<PeopleScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    trailing: IconButton(
-                      tooltip: 'Remove friend',
-                      onPressed: () => _removeFriend(room),
-                      icon: const Icon(Icons.person_remove_alt_1),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'remove') {
+                          _removeFriend(room);
+                          return;
+                        }
+
+                        if (peerUsername.isEmpty) {
+                          return;
+                        }
+
+                        if (value == 'block') {
+                          _blockUser(peerUsername);
+                        } else if (value == 'unblock') {
+                          _unblockUser(peerUsername);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem<String>(
+                          value: 'remove',
+                          child: Text('Remove friend'),
+                        ),
+                        PopupMenuItem<String>(
+                          value: isBlocked ? 'unblock' : 'block',
+                          child: Text(isBlocked ? 'Unblock user' : 'Block user'),
+                        ),
+                      ],
+                      icon: const Icon(Icons.more_vert),
                     ),
                   );
                 }),
+                const Divider(height: 24),
+              ],
+              if (_isLoadingBlocked)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+              if (_blockedDisplayNames.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(14, 4, 14, 6),
+                  child: Text(
+                    'Blocked users',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                ..._blockedDisplayNames.map((name) => ListTile(
+                      leading: const Icon(Icons.block),
+                      title: Text(name),
+                    )),
                 const Divider(height: 24),
               ],
               const Padding(
@@ -280,6 +430,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                 ...provider.users.map((user) {
                   final displayName = user.displayLabel;
                   final username = user.username ?? '';
+                  final isBlocked = _blockedUsernames.contains(username);
                   return ListTile(
                     leading: AppAvatar(
                       url: user.avatar?.source,
@@ -289,11 +440,30 @@ class _PeopleScreenState extends State<PeopleScreen> {
                     subtitle: username.isNotEmpty && username != displayName
                         ? Text('@$username')
                         : null,
-                    trailing: FilledButton.tonal(
-                      onPressed: user.username == null
-                          ? null
-                          : () => _inviteUser(user.username!),
-                      child: const Text('Invite'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FilledButton.tonal(
+                          onPressed: user.username == null || isBlocked
+                              ? null
+                              : () => _inviteUser(user.username!),
+                          child: const Text('Invite'),
+                        ),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          tooltip: isBlocked ? 'Unblock user' : 'Block user',
+                          onPressed: username.isEmpty
+                              ? null
+                              : () {
+                                  if (isBlocked) {
+                                    _unblockUser(username);
+                                  } else {
+                                    _blockUser(username);
+                                  }
+                                },
+                          icon: Icon(isBlocked ? Icons.lock_open : Icons.block),
+                        ),
+                      ],
                     ),
                   );
                 }),
