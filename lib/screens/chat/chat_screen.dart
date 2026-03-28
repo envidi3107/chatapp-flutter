@@ -9,11 +9,13 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/chat_rooms_provider.dart';
+import '../../models/message_receive_model.dart';
 import '../../models/user_block_status_model.dart';
 import '../../models/user_with_avatar_model.dart';
 import '../../services/message_service.dart';
 import '../../services/realtime_service.dart';
 import '../../services/user_service.dart';
+import 'group_members_screen.dart';
 import '../../widgets/message_bubble.dart';
 
 class ChatScreen extends StatelessWidget {
@@ -74,6 +76,8 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   StreamSubscription<PresenceUpdateEvent>? _presenceSub;
   StreamSubscription<UserWithAvatarModel>? _profileSub;
   StreamSubscription<UserBlockStatusModel>? _blockStatusSub;
+  StreamSubscription<GroupMembersAddedEvent>? _groupMembersAddedSub;
+  StreamSubscription<GroupMemberRemovedEvent>? _groupMemberRemovedSub;
   StreamSubscription<TypingStatusEvent>? _typingSub;
   StreamSubscription<ReadStatusEvent>? _readSub;
   Timer? _typingDebounce;
@@ -119,6 +123,8 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     _subscribeBlockStatus();
     _subscribeTyping();
     _subscribeReadStatus();
+    _subscribeGroupMembersAdded();
+    _subscribeGroupMemberRemoved();
   }
 
   @override
@@ -136,6 +142,8 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     _presenceSub?.cancel();
     _profileSub?.cancel();
     _blockStatusSub?.cancel();
+    _groupMembersAddedSub?.cancel();
+    _groupMemberRemovedSub?.cancel();
     _typingSub?.cancel();
     _readSub?.cancel();
     _controller.dispose();
@@ -224,6 +232,135 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
         }
       });
     });
+  }
+
+  void _subscribeGroupMembersAdded() {
+    _groupMembersAddedSub =
+        context.read<RealtimeService>().groupMembersAddedStream.listen((event) {
+      if (!mounted || event.roomId != widget.roomId) {
+        return;
+      }
+
+      if (event.newMembers.isEmpty) {
+        return;
+      }
+
+      final membersText = event.newMembers.join(', ');
+      final addedBy = (event.addedBy ?? '').trim();
+      final text = addedBy.isEmpty
+          ? '$membersText joined the group.'
+          : '$addedBy added $membersText.';
+
+      _showGroupMemberNotice(
+        text: text,
+        type: _GroupSystemNoticeType.added,
+      );
+      unawaited(context.read<ChatRoomsProvider>().loadRooms());
+    });
+  }
+
+  void _subscribeGroupMemberRemoved() {
+    _groupMemberRemovedSub =
+        context.read<RealtimeService>().groupMemberRemovedStream.listen((event) {
+      if (!mounted || event.roomId != widget.roomId) {
+        return;
+      }
+
+      final isLeft = event.action == 'left';
+      final username = (event.removedUsername ?? '').trim();
+      final actionBy = (event.actionBy ?? '').trim();
+      final fallback = isLeft
+          ? 'A member left the group.'
+          : 'A member was removed from the group.';
+      final text = username.isEmpty
+          ? fallback
+          : isLeft
+              ? '$username left the group.'
+              : actionBy.isEmpty || actionBy == username
+                  ? '$username was removed from the group.'
+                  : '$actionBy removed $username from the group.';
+
+      _showGroupMemberNotice(
+        text: text,
+        type: isLeft ? _GroupSystemNoticeType.left : _GroupSystemNoticeType.removed,
+      );
+
+      unawaited(context.read<ChatRoomsProvider>().loadRooms());
+    });
+  }
+
+  void _showGroupMemberNotice({
+    required String text,
+    required _GroupSystemNoticeType type,
+  }) {
+    final messenger = ScaffoldMessenger.of(context);
+    final (icon, backgroundColor) = switch (type) {
+      _GroupSystemNoticeType.added =>
+        (Icons.person_add_alt_1_rounded, const Color(0xFF0B6BCB)),
+      _GroupSystemNoticeType.removed =>
+        (Icons.person_remove_alt_1_rounded, const Color(0xFFB54708)),
+      _GroupSystemNoticeType.left =>
+        (Icons.logout_rounded, const Color(0xFF0D7A43)),
+    };
+
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: backgroundColor,
+        duration: const Duration(seconds: 3),
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  _GroupSystemNotice? _groupSystemNoticeFromMessage(MessageReceiveModel item) {
+    final raw = (item.message ?? '').trim();
+    const prefix = '[GROUP_EVENT:';
+    if (!raw.startsWith(prefix)) {
+      return null;
+    }
+
+    final endIndex = raw.indexOf(']');
+    if (endIndex <= prefix.length) {
+      return null;
+    }
+
+    final typeRaw = raw.substring(prefix.length, endIndex).trim().toUpperCase();
+    final text = raw.substring(endIndex + 1).trim();
+    if (text.isEmpty) {
+      return null;
+    }
+
+    final type = switch (typeRaw) {
+      'ADDED' => _GroupSystemNoticeType.added,
+      'REMOVED' => _GroupSystemNoticeType.removed,
+      'LEFT' => _GroupSystemNoticeType.left,
+      _ => null,
+    };
+    if (type == null) {
+      return null;
+    }
+
+    return _GroupSystemNotice(
+      text: text,
+      type: type,
+      at: item.sentOn?.toLocal() ?? DateTime.now(),
+    );
   }
 
   void _subscribeTyping() {
@@ -736,6 +873,34 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
       seenByAvatarsByIndex[index] = viewers;
     });
 
+    final timelineItems = <_ChatTimelineItem>[];
+    for (var i = 0; i < messages.length; i++) {
+      timelineItems.add(
+        _ChatTimelineItem.message(
+          index: i,
+        ),
+      );
+    }
+
+    String senderAtTimelineIndex(int index) {
+      if (index < 0 || index >= timelineItems.length) {
+        return '';
+      }
+      final messageIndex = timelineItems[index].messageIndex;
+      if (messageIndex == null) {
+        return '';
+      }
+      final message = messages[messageIndex];
+      if (_groupSystemNoticeFromMessage(message) != null) {
+        return '';
+      }
+
+      return (message.sender ??
+              message.senderProfile?.username ??
+              '')
+          .trim();
+    }
+
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
@@ -770,6 +935,32 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
           ],
         ),
         actions: [
+          if (isGroupRoom)
+            IconButton(
+              icon: const Icon(Icons.group_outlined),
+              tooltip: 'Group members',
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                final roomsProvider = context.read<ChatRoomsProvider>();
+
+                final leftGroup = await navigator.push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => GroupMembersScreen(roomId: widget.roomId),
+                  ),
+                );
+
+                if (!mounted) {
+                  return;
+                }
+
+                if (leftGroup == true) {
+                  navigator.pop(true);
+                  return;
+                }
+
+                await roomsProvider.loadRooms();
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             onPressed: chat.loadMessages,
@@ -784,41 +975,38 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
                 : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: chat.messages.length,
+                  itemCount: timelineItems.length,
                     itemBuilder: (context, index) {
-                      final item = messages[index];
+                    final timeline = timelineItems[index];
+                    final messageIndex = timeline.messageIndex!;
+                    final item = messages[messageIndex];
+                    final systemNotice = _groupSystemNoticeFromMessage(item);
+                    if (systemNotice != null) {
+                    return _GroupSystemNoticeTile(notice: systemNotice);
+                    }
+
                       final senderUsername =
                           (item.sender ?? item.senderProfile?.username ?? '').trim();
                       final isMine = myUsername != null && senderUsername == myUsername;
                       final senderProfile = senderProfiles[senderUsername];
 
-                      final previousSender = index > 0
-                          ? (messages[index - 1].sender ??
-                                  messages[index - 1].senderProfile?.username ??
-                                  '')
-                              .trim()
-                          : '';
-                      final nextSender = index + 1 < messages.length
-                          ? (messages[index + 1].sender ??
-                                  messages[index + 1].senderProfile?.username ??
-                                  '')
-                              .trim()
-                          : '';
+                    final previousSender = senderAtTimelineIndex(index - 1);
+                    final nextSender = senderAtTimelineIndex(index + 1);
                       final isStartSenderBlock = senderUsername != previousSender;
                       final isEndSenderBlock = senderUsername != nextSender;
                       const firstMessageGap = 4.0;
                       const differentSenderGap = 18.0;
                       const sameSenderGap = 1.0;
                       final bubbleTopSpacing = isStartSenderBlock
-                          ? (index == 0 ? firstMessageGap : differentSenderGap)
+                      ? (messageIndex == 0 ? firstMessageGap : differentSenderGap)
                           : sameSenderGap;
 
                       final seenByAvatars = isMine
-                          ? (seenByAvatarsByIndex[index] ?? const <SeenAvatarInfo>[])
+                      ? (seenByAvatarsByIndex[messageIndex] ?? const <SeenAvatarInfo>[])
                           : const <SeenAvatarInfo>[];
 
                       String? deliveryStatus;
-                      if (isMine && index == lastOwnIndex) {
+                    if (isMine && messageIndex == lastOwnIndex) {
                         deliveryStatus = seenByAvatars.isNotEmpty
                             ? '\u0110\u00e3 xem'
                             : '\u0110\u00e3 g\u1eedi';
@@ -977,6 +1165,97 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+enum _GroupSystemNoticeType {
+  added,
+  removed,
+  left,
+}
+
+class _GroupSystemNotice {
+  const _GroupSystemNotice({
+    required this.text,
+    required this.type,
+    required this.at,
+  });
+
+  final String text;
+  final _GroupSystemNoticeType type;
+  final DateTime at;
+}
+
+class _ChatTimelineItem {
+  const _ChatTimelineItem._({
+    required this.messageIndex,
+  });
+
+  factory _ChatTimelineItem.message({
+    required int index,
+  }) {
+    return _ChatTimelineItem._(
+      messageIndex: index,
+    );
+  }
+
+  final int? messageIndex;
+}
+
+class _GroupSystemNoticeTile extends StatelessWidget {
+  const _GroupSystemNoticeTile({required this.notice});
+
+  final _GroupSystemNotice notice;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, color) = switch (notice.type) {
+      _GroupSystemNoticeType.added => (Icons.person_add_alt_1_rounded, const Color(0xFF0B6BCB)),
+      _GroupSystemNoticeType.removed => (Icons.person_remove_alt_1_rounded, const Color(0xFFB54708)),
+      _GroupSystemNoticeType.left => (Icons.logout_rounded, const Color(0xFF0D7A43)),
+    };
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 320),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3F4F6),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  notice.text,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFF374151),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                DateFormat('HH:mm').format(notice.at.toLocal()),
+                style: const TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

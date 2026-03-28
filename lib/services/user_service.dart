@@ -23,7 +23,6 @@ class UserService {
         'q': query,
         'limit': limit,
       },
-      authRequired: false,
     );
 
     if (response.statusCode != 200) {
@@ -46,7 +45,8 @@ class UserService {
       throw Exception('Load presence failed: ${response.body}');
     }
 
-    final body = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    final body =
+        jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
     return UserPresenceModel.fromJson(body);
   }
 
@@ -57,7 +57,8 @@ class UserService {
       throw Exception('Load profile failed: ${response.body}');
     }
 
-    final body = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    final body =
+        jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
     return UserWithAvatarModel.fromJson(body);
   }
 
@@ -93,7 +94,8 @@ class UserService {
       throw Exception('Update profile failed: ${response.body}');
     }
 
-    final body = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    final body =
+        jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
     return UserWithAvatarModel.fromJson(body);
   }
 
@@ -131,13 +133,15 @@ class UserService {
   }
 
   Future<UserBlockStatusModel> getBlockStatus(String username) async {
-    final response = await _apiClient.get('/api/v1/users/$username/block-status/');
+    final response =
+        await _apiClient.get('/api/v1/users/$username/block-status/');
 
     if (response.statusCode != 200) {
       throw Exception('Load block status failed: ${response.body}');
     }
 
-    final body = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    final body =
+        jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
     return UserBlockStatusModel.fromJson(body);
   }
 }

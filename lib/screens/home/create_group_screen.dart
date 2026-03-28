@@ -77,6 +77,17 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       setState(() {
         _searchResults = filtered;
       });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _searchResults = const [];
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Search user failed: $error')),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -87,6 +98,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   }
 
   Future<void> _createGroup() async {
+    final roomsProvider = context.read<ChatRoomsProvider>();
+    final authProvider = context.read<AuthProvider>();
     final groupName = _groupNameController.text.trim();
     if (groupName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -113,13 +126,12 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           );
 
       final room = dto.toChatRoomModel();
-      context.read<ChatRoomsProvider>().upsertRoom(room);
-
       if (!mounted) {
         return;
       }
 
-      final currentUsername = context.read<AuthProvider>().username;
+      roomsProvider.upsertRoom(room);
+      final currentUsername = authProvider.username;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => ChatScreen(

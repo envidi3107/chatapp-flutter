@@ -88,7 +88,7 @@ class GroupChatService {
     return GroupChatDto.fromJson(json);
   }
 
-  /// Add members to a group (admin only)
+  /// Add members to a group (any current member)
   /// 
   /// [roomId] - Group room ID
   /// [memberIds] - List of user IDs to add
@@ -109,7 +109,7 @@ class GroupChatService {
     return GroupChatDto.fromJson(json);
   }
 
-  /// Remove a member from a group (admin or self)
+  /// Remove a member from a group (creator only)
   Future<void> removeMember({
     required int roomId,
     required int userId,
@@ -146,6 +146,7 @@ class GroupChatDto {
     required this.createdOn,
     required this.latestMessage,
     required this.isAdmin,
+    required this.isOwner,
   });
 
   final int id;
@@ -156,11 +157,28 @@ class GroupChatDto {
   final DateTime? createdOn;
   final MessageReceiveModel? latestMessage;
   final bool isAdmin;
+  final bool isOwner;
 
   factory GroupChatDto.fromJson(Map<String, dynamic> json) {
+    bool parseBool(dynamic value) {
+      if (value is bool) {
+        return value;
+      }
+      if (value is String) {
+        final normalized = value.trim().toLowerCase();
+        return normalized == 'true' || normalized == '1';
+      }
+      if (value is num) {
+        return value != 0;
+      }
+      return false;
+    }
+
     final avatarJson = json['avatar'];
     final latestMessageJson = json['latestMessage'];
     final membersJson = json['members'] as List<dynamic>? ?? [];
+    final rawIsAdmin = json.containsKey('isAdmin') ? json['isAdmin'] : json['admin'];
+    final rawIsOwner = json.containsKey('isOwner') ? json['isOwner'] : json['owner'];
 
     return GroupChatDto(
       id: (json['id'] ?? 0) as int,
@@ -177,7 +195,8 @@ class GroupChatDto {
       latestMessage: latestMessageJson is Map<String, dynamic>
           ? MessageReceiveModel.fromJson(latestMessageJson)
           : null,
-      isAdmin: json['isAdmin'] as bool? ?? false,
+      isAdmin: parseBool(rawIsAdmin),
+      isOwner: parseBool(rawIsOwner),
     );
   }
 
