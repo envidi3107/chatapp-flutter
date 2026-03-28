@@ -103,6 +103,53 @@ class GroupUpdatedEvent {
   }
 }
 
+class ChatRoomPinnedEvent {
+  const ChatRoomPinnedEvent({
+    required this.roomId,
+    required this.pinned,
+    required this.chatRoom,
+  });
+
+  final int? roomId;
+  final bool? pinned;
+  final ChatRoomModel? chatRoom;
+
+  factory ChatRoomPinnedEvent.fromJson(Map<String, dynamic> json) {
+    int? parseInt(dynamic value) {
+      if (value is int) {
+        return value;
+      }
+      return int.tryParse(value?.toString() ?? '');
+    }
+
+    bool? parseBool(dynamic value) {
+      if (value is bool) {
+        return value;
+      }
+      final raw = value?.toString().trim().toLowerCase();
+      if (raw == 'true' || raw == '1') {
+        return true;
+      }
+      if (raw == 'false' || raw == '0') {
+        return false;
+      }
+      return null;
+    }
+
+    final roomJson = json['chatRoom'] ?? json['room'] ?? json['chatRoomDto'];
+    final room = roomJson is Map<String, dynamic>
+        ? ChatRoomModel.fromJson(roomJson)
+        : null;
+    final roomId = parseInt(json['roomId']) ?? room?.id;
+
+    return ChatRoomPinnedEvent(
+      roomId: roomId,
+      pinned: parseBool(json['pinned']) ?? room?.pinned,
+      chatRoom: room,
+    );
+  }
+}
+
 class GroupMemberRemovedEvent {
   const GroupMemberRemovedEvent({
     required this.roomId,
@@ -253,6 +300,8 @@ class RealtimeService {
       StreamController<ChatRoomCreatedEvent>.broadcast();
   final StreamController<GroupUpdatedEvent> _groupUpdatedController =
       StreamController<GroupUpdatedEvent>.broadcast();
+  final StreamController<ChatRoomPinnedEvent> _chatRoomPinnedController =
+      StreamController<ChatRoomPinnedEvent>.broadcast();
   final StreamController<GroupMemberRemovedEvent>
       _groupMemberRemovedController =
       StreamController<GroupMemberRemovedEvent>.broadcast();
@@ -281,6 +330,8 @@ class RealtimeService {
       _chatRoomCreatedController.stream;
   Stream<GroupUpdatedEvent> get groupUpdatedStream =>
       _groupUpdatedController.stream;
+  Stream<ChatRoomPinnedEvent> get chatRoomPinnedStream =>
+      _chatRoomPinnedController.stream;
   Stream<GroupMemberRemovedEvent> get groupMemberRemovedStream =>
       _groupMemberRemovedController.stream;
   Stream<GroupMembersAddedEvent> get groupMembersAddedStream =>
@@ -369,6 +420,7 @@ class RealtimeService {
           _subscribeFriendRemoved();
           _subscribeChatRoomCreated();
           _subscribeGroupUpdated();
+          _subscribeChatRoomPinned();
           _subscribeGroupMembersAdded();
           _subscribeGroupMemberRemoved();
           _subscribePresence();
@@ -423,6 +475,7 @@ class RealtimeService {
     _friendRemovedController.close();
     _chatRoomCreatedController.close();
     _groupUpdatedController.close();
+    _chatRoomPinnedController.close();
     _groupMemberRemovedController.close();
     _groupMembersAddedController.close();
     _presenceController.close();
@@ -589,6 +642,25 @@ class RealtimeService {
         }
 
         _groupUpdatedController.add(GroupUpdatedEvent.fromJson(decoded));
+      },
+    );
+  }
+
+  void _subscribeChatRoomPinned() {
+    _client?.subscribe(
+      destination: '/user/queue/chatrooms/pinned/',
+      callback: (frame) {
+        final body = frame.body;
+        if (body == null || body.isEmpty) {
+          return;
+        }
+
+        final decoded = jsonDecode(body);
+        if (decoded is! Map<String, dynamic>) {
+          return;
+        }
+
+        _chatRoomPinnedController.add(ChatRoomPinnedEvent.fromJson(decoded));
       },
     );
   }

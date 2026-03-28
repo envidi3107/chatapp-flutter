@@ -272,6 +272,7 @@ class GroupChatDto {
           .toList(),
       type: type,
       createdOn: createdOn,
+      pinned: false,
       latestMessage: latestMessage,
     );
   }

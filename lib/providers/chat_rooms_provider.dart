@@ -44,6 +44,7 @@ class ChatRoomsProvider extends ChangeNotifier {
   StreamSubscription<FriendRemovedEvent>? _friendRemovedSub;
   StreamSubscription<ChatRoomCreatedEvent>? _chatRoomCreatedSub;
   StreamSubscription<GroupUpdatedEvent>? _groupUpdatedSub;
+  StreamSubscription<ChatRoomPinnedEvent>? _chatRoomPinnedSub;
   StreamSubscription<PresenceUpdateEvent>? _presenceSub;
   StreamSubscription<UserWithAvatarModel>? _profileSub;
   final Map<int, int> _unreadCounts = {};
@@ -98,14 +99,50 @@ class ChatRoomsProvider extends ChangeNotifier {
 
   int unreadCountFor(int roomId) => _unreadCounts[roomId] ?? 0;
   bool isPeerOnlineFor(int roomId) => _roomPeerOnline[roomId] ?? false;
+  bool isPinned(int roomId) => _roomById(roomId)?.pinned == true;
 
-  void upsertRoom(ChatRoomModel room) {
+  Future<bool> togglePinnedRoom(int roomId) async {
+    final room = _roomById(roomId);
+    if (room == null) {
+      return false;
+    }
+
+    final nextPinned = !room.pinned;
+    upsertRoom(
+      room.copyWith(pinned: nextPinned),
+      preservePinnedFromExisting: false,
+    );
+    var requestSucceeded = false;
+    try {
+      if (nextPinned) {
+        await _chatRoomService.pinRoom(roomId: roomId);
+      } else {
+        await _chatRoomService.unpinRoom(roomId: roomId);
+      }
+      requestSucceeded = true;
+    } finally {
+      if (!requestSucceeded) {
+        upsertRoom(room, preservePinnedFromExisting: false);
+      }
+    }
+
+    return nextPinned;
+  }
+
+  void upsertRoom(
+    ChatRoomModel room, {
+    bool preservePinnedFromExisting = true,
+  }) {
     final index = _rooms.indexWhere((item) => item.id == room.id);
     if (index < 0) {
       _rooms = _sortRooms([room, ..._rooms]);
     } else {
+      final existing = _rooms[index];
+      final nextRoom = preservePinnedFromExisting
+          ? room.copyWith(pinned: existing.pinned)
+          : room;
       final next = [..._rooms];
-      next[index] = room;
+      next[index] = nextRoom;
       _rooms = _sortRooms(next);
     }
 
@@ -267,6 +304,31 @@ class ChatRoomsProvider extends ChangeNotifier {
       unawaited(loadRooms());
     });
 
+    _chatRoomPinnedSub ??=
+        _realtimeService.chatRoomPinnedStream.listen((event) {
+      final updatedRoom = event.chatRoom;
+      if (updatedRoom != null) {
+        upsertRoom(updatedRoom, preservePinnedFromExisting: false);
+        return;
+      }
+
+      final roomId = event.roomId;
+      final pinned = event.pinned;
+      if (roomId == null || pinned == null) {
+        return;
+      }
+
+      final room = _roomById(roomId);
+      if (room == null) {
+        return;
+      }
+
+      upsertRoom(
+        room.copyWith(pinned: pinned),
+        preservePinnedFromExisting: false,
+      );
+    });
+
     _presenceSub ??= _realtimeService.presenceStream.listen((event) {
       final presence = event.presence;
       final username = presence?.username ?? '';
@@ -314,6 +376,9 @@ class ChatRoomsProvider extends ChangeNotifier {
 
     _groupUpdatedSub?.cancel();
     _groupUpdatedSub = null;
+
+    _chatRoomPinnedSub?.cancel();
+    _chatRoomPinnedSub = null;
 
     _presenceSub?.cancel();
     _presenceSub = null;
@@ -421,8 +486,14 @@ class ChatRoomsProvider extends ChangeNotifier {
   }
 
   List<ChatRoomModel> _sortRooms(List<ChatRoomModel> input) {
-    final sorted = [...input]
-      ..sort((a, b) => b.latestTimestamp.compareTo(a.latestTimestamp));
+    final sorted = [...input]..sort((a, b) {
+        final aPinned = a.pinned;
+        final bPinned = b.pinned;
+        if (aPinned != bPinned) {
+          return aPinned ? -1 : 1;
+        }
+        return b.latestTimestamp.compareTo(a.latestTimestamp);
+      });
     return sorted;
   }
 

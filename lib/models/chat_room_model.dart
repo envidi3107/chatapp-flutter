@@ -22,6 +22,7 @@ class ChatRoomModel {
     required this.membersUsername,
     required this.type,
     required this.createdOn,
+    required this.pinned,
     required this.latestMessage,
   });
 
@@ -31,6 +32,7 @@ class ChatRoomModel {
   final List<String> membersUsername;
   final ChatRoomType type;
   final DateTime? createdOn;
+  final bool pinned;
   final MessageReceiveModel? latestMessage;
 
   factory ChatRoomModel.fromJson(Map<String, dynamic> json) {
@@ -47,6 +49,7 @@ class ChatRoomModel {
           .toList(),
       type: parseChatRoomType(json['type'] as String?),
       createdOn: DateTime.tryParse((json['createdOn'] ?? '').toString()),
+      pinned: json['pinned'] == true,
       latestMessage: latestMessageJson is Map<String, dynamic>
           ? MessageReceiveModel.fromJson(latestMessageJson)
           : null,
@@ -60,6 +63,7 @@ class ChatRoomModel {
     List<String>? membersUsername,
     ChatRoomType? type,
     DateTime? createdOn,
+    bool? pinned,
     MessageReceiveModel? latestMessage,
   }) {
     return ChatRoomModel(
@@ -69,6 +73,7 @@ class ChatRoomModel {
       membersUsername: membersUsername ?? this.membersUsername,
       type: type ?? this.type,
       createdOn: createdOn ?? this.createdOn,
+      pinned: pinned ?? this.pinned,
       latestMessage: latestMessage ?? this.latestMessage,
     );
   }
@@ -127,7 +132,8 @@ class ChatRoomModel {
 
     final content = (latest.message ?? '').trim();
     if (content.isNotEmpty) {
-      final isMine = currentUsername != null && latest.sender == currentUsername;
+      final isMine =
+          currentUsername != null && latest.sender == currentUsername;
       final senderName = (latest.sender ?? '').trim();
       if (senderName.isEmpty || isMine) {
         return content;

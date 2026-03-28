@@ -23,10 +23,30 @@ class ChatRoomService {
   }
 
   Future<void> removeFriend({required int roomId}) async {
-    final response = await _apiClient.delete('/api/v1/chatrooms/$roomId/friend/');
+    final response =
+        await _apiClient.delete('/api/v1/chatrooms/$roomId/friend/');
 
     if (response.statusCode != 204) {
       throw Exception('Remove friend failed: ${response.body}');
+    }
+  }
+
+  Future<void> pinRoom({required int roomId}) async {
+    final response = await _apiClient.postJson(
+      '/api/v1/chatrooms/$roomId/pin/',
+      const {},
+    );
+
+    if (response.statusCode != 204) {
+      throw Exception('Pin room failed: ${response.body}');
+    }
+  }
+
+  Future<void> unpinRoom({required int roomId}) async {
+    final response = await _apiClient.delete('/api/v1/chatrooms/$roomId/pin/');
+
+    if (response.statusCode != 204) {
+      throw Exception('Unpin room failed: ${response.body}');
     }
   }
 }

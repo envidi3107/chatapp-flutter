@@ -11,14 +11,18 @@ class ChatRoomTile extends StatelessWidget {
     required this.currentUsername,
     required this.unreadCount,
     required this.isPeerOnline,
+    required this.isPinned,
     required this.onTap,
+    this.onLongPress,
   });
 
   final ChatRoomModel room;
   final String? currentUsername;
   final int unreadCount;
   final bool isPeerOnline;
+  final bool isPinned;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +35,7 @@ class ChatRoomTile extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         child: Row(
@@ -75,6 +80,15 @@ class ChatRoomTile extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                if (isPinned)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 3),
+                    child: Icon(
+                      Icons.push_pin_rounded,
+                      size: 16,
+                      color: Color(0xFF168AFF),
+                    ),
+                  ),
                 if (dateText.isNotEmpty)
                   Text(
                     dateText,

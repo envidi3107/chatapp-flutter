@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/chat_room_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_rooms_provider.dart';
 import '../../widgets/chat_room_tile.dart';
@@ -40,6 +41,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final currentUsername = context.watch<AuthProvider>().username;
     provider.setCurrentUsername(currentUsername);
     _showPendingSystemNotice(provider);
+    final pinnedRooms =
+        provider.rooms.where((room) => provider.isPinned(room.id)).toList();
+    final regularRooms =
+        provider.rooms.where((room) => !provider.isPinned(room.id)).toList();
 
     if (provider.isLoading && provider.rooms.isEmpty) {
       return const Center(child: CircularProgressIndicator());
@@ -84,32 +89,156 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          ...provider.rooms.map(
-            (room) => ChatRoomTile(
+          if (provider.rooms.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Text(
+                'No conversations yet.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.black54),
+              ),
+            ),
+          if (pinnedRooms.isNotEmpty)
+            _sectionLabel(context, 'Pinned conversations'),
+          ...pinnedRooms.map(
+            (room) => _buildRoomTile(
+              context: context,
+              provider: provider,
               room: room,
               currentUsername: currentUsername,
-              unreadCount: provider.unreadCountFor(room.id),
-              isPeerOnline: provider.isPeerOnlineFor(room.id),
-              onTap: () {
-                provider.markRoomRead(room.id);
-                final displayName = room.displayNameFor(currentUsername);
-                final peerUsername = room.duoPeerFor(currentUsername);
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ChatScreen(
-                      roomId: room.id,
-                      roomName: displayName,
-                      peerUsername: peerUsername,
-                    ),
-                  ),
-                );
-              },
+            ),
+          ),
+          if (pinnedRooms.isNotEmpty && regularRooms.isNotEmpty)
+            _sectionLabel(context, 'All conversations'),
+          ...regularRooms.map(
+            (room) => _buildRoomTile(
+              context: context,
+              provider: provider,
+              room: room,
+              currentUsername: currentUsername,
             ),
           ),
           const SizedBox(height: 12),
         ],
       ),
     );
+  }
+
+  Widget _sectionLabel(BuildContext context, String text) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Colors.black54,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
+  }
+
+  Widget _buildRoomTile({
+    required BuildContext context,
+    required ChatRoomsProvider provider,
+    required ChatRoomModel room,
+    required String? currentUsername,
+  }) {
+    final isPinned = provider.isPinned(room.id);
+    return ChatRoomTile(
+      room: room,
+      currentUsername: currentUsername,
+      unreadCount: provider.unreadCountFor(room.id),
+      isPeerOnline: provider.isPeerOnlineFor(room.id),
+      isPinned: isPinned,
+      onTap: () {
+        provider.markRoomRead(room.id);
+        final displayName = room.displayNameFor(currentUsername);
+        final peerUsername = room.duoPeerFor(currentUsername);
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              roomId: room.id,
+              roomName: displayName,
+              peerUsername: peerUsername,
+            ),
+          ),
+        );
+      },
+      onLongPress: () => _showRoomActions(
+        context: context,
+        provider: provider,
+        room: room,
+        isPinned: isPinned,
+      ),
+    );
+  }
+
+  Future<void> _showRoomActions({
+    required BuildContext context,
+    required ChatRoomsProvider provider,
+    required ChatRoomModel room,
+    required bool isPinned,
+  }) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(
+                  isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+                ),
+                title:
+                    Text(isPinned ? 'Unpin conversation' : 'Pin conversation'),
+                onTap: () => Navigator.of(sheetContext).pop('toggle_pin'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (action != 'toggle_pin' || !context.mounted) {
+      return;
+    }
+
+    bool isNowPinned;
+    try {
+      isNowPinned = await provider.togglePinnedRoom(room.id);
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('Update pin failed: $error'),
+          ),
+        );
+      return;
+    }
+
+    if (!context.mounted) {
+      return;
+    }
+
+    final label = room.displayNameFor(context.read<AuthProvider>().username);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            isNowPinned ? 'Pinned "$label" to the top.' : 'Unpinned "$label".',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
   }
 
   void _showPendingSystemNotice(ChatRoomsProvider provider) {
@@ -124,7 +253,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
         return;
       }
 
-      final notice = context.read<ChatRoomsProvider>().consumePendingSystemNotice();
+      final notice =
+          context.read<ChatRoomsProvider>().consumePendingSystemNotice();
       if (notice == null) {
         return;
       }
