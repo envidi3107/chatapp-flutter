@@ -128,6 +128,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> updateMyProfile({
     required String displayName,
     XFile? avatar,
+    String? language,
   }) async {
     _error = null;
     notifyListeners();
@@ -136,6 +137,7 @@ class AuthProvider extends ChangeNotifier {
       final updated = await _userService.updateMyProfile(
         displayName: displayName,
         avatar: avatar,
+        language: language,
       );
 
       _profile = updated;

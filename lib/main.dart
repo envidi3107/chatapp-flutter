@@ -23,12 +23,13 @@ void main() {
   final messageService = MessageService(apiClient);
   final invitationService = InvitationService(apiClient);
   final userService = UserService(apiClient);
-  final realtimeService = RealtimeService(tokenStorage);
+  final realtimeService = RealtimeService(tokenStorage, apiClient);
   final unreadStateService = UnreadStateService();
 
   runApp(
     MultiProvider(
       providers: createAppProviders(
+        apiClient: apiClient,
         authService: authService,
         chatRoomService: chatRoomService,
         groupChatService: groupChatService,

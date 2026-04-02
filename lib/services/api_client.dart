@@ -185,6 +185,10 @@ class ApiClient {
     return headers;
   }
 
+  /// Refreshes the access token using the stored refresh token.
+  /// Returns true if a new access token was saved, false otherwise.
+  Future<bool> refreshAccessToken() => _refreshToken();
+
   Future<bool> _refreshToken() async {
     final refreshToken = await _tokenStorage.getRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) {

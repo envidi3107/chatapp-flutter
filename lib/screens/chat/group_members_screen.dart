@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_theme.dart';
+
 import '../../models/user_with_avatar_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_rooms_provider.dart';
@@ -377,7 +379,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     final nextName = _groupNameController.text.trim();
     if (nextName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Group name cannot be empty.')),
+        const SnackBar(content: Text('Tên nhóm không được để trống.')),
       );
       return;
     }
@@ -387,7 +389,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
 
     if (!hasNameChanged && !hasAvatarChanged) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No changes to save.')),
+        const SnackBar(content: Text('Không có thay đổi nào để lưu.')),
       );
       return;
     }
@@ -428,7 +430,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
           content: Text(
             _friendlyError(
               error,
-              fallback: 'Update group information failed.',
+              fallback: 'Cập nhật thông tin thất bại.',
             ),
           ),
         ),
@@ -473,7 +475,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
 
       roomsProvider.upsertRoom(dto.toChatRoomModel());
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Members added successfully.')),
+        const SnackBar(content: Text('Đã thêm thành viên thành công.')),
       );
     } catch (error) {
       if (!mounted) {
@@ -510,16 +512,17 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Remove member'),
-          content: Text('Remove ${member.displayLabel} from this group?'),
+          backgroundColor: AppColors.bgCard,
+          title: Text('Xoá thành viên', style: const TextStyle(color: AppColors.textPrimary)),
+          content: Text('Bạn có chắc xoá ${member.displayLabel} khỏi nhóm?', style: const TextStyle(color: AppColors.textPrimary)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: const Text('Huỷ'),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Remove'),
+              child: const Text('Xoá'),
             ),
           ],
         );
@@ -583,16 +586,17 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Leave group'),
-          content: const Text('Are you sure you want to leave this group?'),
+          backgroundColor: AppColors.bgCard,
+          title: Text('Rời nhóm', style: const TextStyle(color: AppColors.textPrimary)),
+          content: Text('Bạn có chắc chắn muốn rời nhóm?', style: const TextStyle(color: AppColors.textPrimary)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: const Text('Huỷ'),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Leave'),
+              child: const Text('Rời nhóm'),
             ),
           ],
         );
@@ -649,14 +653,16 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Dissolve group'),
-          content: const Text(
-            'This action will permanently delete the group and all messages for every member. Continue?',
+          backgroundColor: AppColors.bgCard,
+          title: Text('Giải tán nhóm', style: const TextStyle(color: AppColors.textPrimary)),
+          content: Text(
+            'Hành động này sẽ xoá nhóm vĩnh viễn và toàn bộ tin nhắn. Tiếp tục?',
+            style: const TextStyle(color: AppColors.textPrimary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: const Text('Huỷ'),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -664,7 +670,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                 foregroundColor: Colors.white,
               ),
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Dissolve'),
+              child: const Text('Giải tán'),
             ),
           ],
         );
@@ -722,25 +728,25 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
 
     if (_isLoading && group == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Group members')),
+        appBar: AppBar(title: const Text('Thành viên nhóm')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (group == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Group members')),
+        appBar: AppBar(title: const Text('Thành viên nhóm')),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_error ?? 'Cannot load group members.'),
+                Text(_error ?? 'Không thể tải thành viên.', style: const TextStyle(color: AppColors.textPrimary)),
                 const SizedBox(height: 10),
                 FilledButton(
                   onPressed: _isLoading ? null : () => _loadGroup(),
-                  child: const Text('Retry'),
+                  child: const Text('Thử lại'),
                 ),
               ],
             ),
@@ -765,8 +771,10 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     final hasQuery = _searchController.text.trim().isNotEmpty;
 
     return Scaffold(
+      backgroundColor: AppColors.bgDark,
       appBar: AppBar(
-        title: Text('Members (${group.members.length})'),
+        title: Text('Thành viên (${group.members.length})', style: const TextStyle(color: AppColors.textPrimary)),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
@@ -783,29 +791,30 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
               margin: const EdgeInsets.only(top: 8),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF4E5),
+                color: AppColors.bgInput,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFFD08A)),
+                border: Border.all(color: AppColors.border),
               ),
               child: Text(
                 _error!,
-                style: const TextStyle(color: Color(0xFF7A4A00)),
+                style: const TextStyle(color: Colors.redAccent),
               ),
             ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF4F7FF),
+              color: AppColors.bgCard,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFCDD9FF)),
+              border: Border.all(color: AppColors.border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Group information',
+                  'Thông tin nhóm',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.textPrimary,
                         fontWeight: FontWeight.w700,
                       ),
                 ),

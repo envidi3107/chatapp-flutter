@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_theme.dart';
 import '../../models/chat_room_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_rooms_provider.dart';
@@ -69,7 +70,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               const SizedBox(height: 10),
               FilledButton(
                 onPressed: provider.loadRooms,
-                child: const Text('Retry'),
+                child: const Text('Thử lại'),
               ),
             ],
           ),
@@ -79,54 +80,73 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
     return RefreshIndicator(
       onRefresh: provider.loadRooms,
+      color: AppColors.primary,
+      backgroundColor: AppColors.bgCard,
       child: ListView(
         children: [
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
               controller: _searchController,
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
               onChanged: (value) {
                 setState(() {
                   _searchQuery = value;
                 });
               },
               decoration: InputDecoration(
-                hintText: 'Search in chats',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  onPressed: () {
-                    if (hasSearchQuery) {
-                      _searchController.clear();
-                      setState(() {
-                        _searchQuery = '';
-                      });
-                      return;
-                    }
-
-                    provider.loadRooms();
-                  },
-                  icon: Icon(
-                    hasSearchQuery ? Icons.close_rounded : Icons.refresh,
-                  ),
+                hintText: 'Tìm kiếm tin nhắn',
+                hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 14),
+                prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 20),
+                filled: true,
+                fillColor: AppColors.bgInput,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.border, width: 1),
                 ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.border, width: 1),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                ),
+                suffixIcon: hasSearchQuery
+                    ? IconButton(
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                        icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 18),
+                      )
+                    : null,
               ),
             ),
           ),
           const SizedBox(height: 8),
           if (filteredRooms.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              child: Text(
-                hasSearchQuery
-                    ? 'No conversations found for "${_searchQuery.trim()}".'
-                    : 'No conversations yet.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.black54),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+              child: Column(
+                children: [
+                  const Icon(Icons.chat_bubble_outline_rounded,
+                      color: AppColors.textHint, size: 48),
+                  const SizedBox(height: 12),
+                  Text(
+                    hasSearchQuery
+                        ? 'Không tìm thấy cuộc trò chuyện nào cho "${_searchQuery.trim()}"'
+                        : 'Chưa có cuộc trò chuyện nào',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                  ),
+                ],
               ),
             ),
           if (pinnedRooms.isNotEmpty)
-            _sectionLabel(context, 'Pinned conversations'),
+            _sectionLabel(context, 'Đã ghim'),
           ...pinnedRooms.map(
             (room) => _buildRoomTile(
               context: context,
@@ -136,7 +156,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
           ),
           if (pinnedRooms.isNotEmpty && regularRooms.isNotEmpty)
-            _sectionLabel(context, 'All conversations'),
+            _sectionLabel(context, 'Tất cả cuộc trò chuyện'),
           ...regularRooms.map(
             (room) => _buildRoomTile(
               context: context,
@@ -153,13 +173,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   Widget _sectionLabel(BuildContext context, String text) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Text(
         text,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: Colors.black54,
-              fontWeight: FontWeight.w700,
-            ),
+        style: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }
@@ -249,9 +271,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
               ListTile(
                 leading: Icon(
                   isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+                  color: AppColors.primary,
                 ),
-                title:
-                    Text(isPinned ? 'Unpin conversation' : 'Pin conversation'),
+                title: Text(
+                  isPinned ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện',
+                  style: const TextStyle(color: AppColors.textPrimary),
+                ),
                 onTap: () => Navigator.of(sheetContext).pop('toggle_pin'),
               ),
             ],
@@ -277,7 +302,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ..showSnackBar(
           SnackBar(
             behavior: SnackBarBehavior.floating,
-            content: Text('Update pin failed: $error'),
+            content: Text('Cập nhật ghim thất bại: $error'),
           ),
         );
       return;

@@ -212,7 +212,7 @@ class MessageBubble extends StatelessWidget {
                             DateFormat('HH:mm').format(sentOn),
                             style: TextStyle(
                               color: isMine
-                                  ? Colors.white.withOpacity(0.85)
+                                  ? Colors.white.withValues(alpha: 0.85)
                                   : Colors.black45,
                               fontSize: 11,
                             ),

@@ -86,7 +86,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         _searchResults = const [];
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Search user failed: $error')),
+        SnackBar(content: Text('Tìm kiếm thất bại: $error')),
       );
     } finally {
       if (mounted) {
@@ -103,14 +103,14 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     final groupName = _groupNameController.text.trim();
     if (groupName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a group name')),
+        const SnackBar(content: Text('Vui lòng nhập tên nhóm')),
       );
       return;
     }
 
     if (_selectedUsersById.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least 2 members')),
+        const SnackBar(content: Text('Vui lòng chọn ít nhất 2 thành viên')),
       );
       return;
     }
@@ -147,7 +147,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Create group failed: $e')),
+        SnackBar(content: Text('Tạo nhóm thất bại: $e')),
       );
     } finally {
       if (mounted) {
@@ -181,7 +181,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Group'),
+        title: const Text('Tạo nhóm mới'),
       ),
       body: Column(
         children: [
@@ -191,8 +191,18 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               controller: _groupNameController,
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
-                labelText: 'Group name',
-                hintText: 'Enter group name',
+                labelText: 'Tên nhóm',
+                hintText: 'Nhập tên nhóm',
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Tên nhóm có thể chứa tối đa 100 ký tự.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
               ),
             ),
           ),
@@ -202,7 +212,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               controller: _searchController,
               onChanged: _onSearchChanged,
               decoration: const InputDecoration(
-                hintText: 'Search username to add',
+                hintText: 'Tìm kiếm người dùng',
                 prefixIcon: Icon(Icons.search),
               ),
             ),
@@ -212,12 +222,12 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             child: Row(
               children: [
                 Text(
-                  'Selected: ${_selectedUsersById.length}',
+                  'Đã chọn: ${_selectedUsersById.length}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  'Minimum 2 members',
+                  'Tối thiểu 2 thành viên',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.black54,
                       ),
@@ -233,31 +243,72 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           if (selectedUsers.isNotEmpty)
             Container(
               width: double.infinity,
+              height: 100,
               margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: selectedUsers
-                    .map(
-                      (user) => InputChip(
-                        label: Text(user.displayLabel),
-                        onDeleted: () {
-                          _toggleUser(user);
-                        },
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: selectedUsers.length,
+                itemBuilder: (context, index) {
+                  final user = selectedUsers[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 16.0),
+                    child: SizedBox(
+                      width: 64,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              AppAvatar(
+                                url: user.avatar?.source,
+                                name: user.displayLabel,
+                                radius: 24,
+                              ),
+                              Positioned(
+                                top: -4,
+                                right: -4,
+                                child: GestureDetector(
+                                  onTap: () => _toggleUser(user),
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.cancel,
+                                      color: Colors.grey,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            user.displayLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
                       ),
-                    )
-                    .toList(),
+                    ),
+                  );
+                },
               ),
             ),
           const SizedBox(height: 6),
           Expanded(
             child: !hasQuery
                 ? const Center(
-                    child: Text('Search users to add members'),
+                    child: Text('Tìm kiếm người dùng để thêm vào nhóm'),
                   )
                 : _searchResults.isEmpty && !_isSearching
                     ? const Center(
-                        child: Text('No users found'),
+                        child: Text('Không tìm thấy người dùng'),
                       )
                     : ListView.builder(
                         itemCount: _searchResults.length,
@@ -305,7 +356,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Create group chat'),
+                    : const Text('Tạo nhóm chat'),
               ),
             ),
           ),

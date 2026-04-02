@@ -6,12 +6,14 @@ class UserWithAvatarModel {
     required this.username,
     required this.displayName,
     required this.avatar,
+    this.language,
   });
 
   final int? id;
   final String? username;
   final String? displayName;
   final AttachmentModel? avatar;
+  final String? language;
 
   String get displayLabel {
     final name = (displayName ?? '').trim();
@@ -33,12 +35,15 @@ class UserWithAvatarModel {
     String? displayName,
     AttachmentModel? avatar,
     bool clearAvatar = false,
+    String? language,
+    bool clearLanguage = false,
   }) {
     return UserWithAvatarModel(
       id: id ?? this.id,
       username: username ?? this.username,
       displayName: displayName ?? this.displayName,
       avatar: clearAvatar ? null : (avatar ?? this.avatar),
+      language: clearLanguage ? null : (language ?? this.language),
     );
   }
 
@@ -51,6 +56,7 @@ class UserWithAvatarModel {
       avatar: avatarJson is Map<String, dynamic>
           ? AttachmentModel.fromJson(avatarJson)
           : null,
+      language: json['language'] as String?,
     );
   }
 }

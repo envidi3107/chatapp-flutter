@@ -3,16 +3,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_rooms_provider.dart';
 import '../../providers/invitation_provider.dart';
 import '../../providers/user_search_provider.dart';
 import '../../services/realtime_service.dart';
+import '../chat/ai_chat_screen.dart';
+import 'add_friend_screen.dart';
 import 'chat_list_screen.dart';
 import 'create_group_screen.dart';
 import 'invitations_screen.dart';
 import 'people_screen.dart';
-import 'profile_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,8 +36,6 @@ class _HomeScreenState extends State<HomeScreen> {
     InvitationsScreen(),
   ];
 
-  static const _tabTitles = ['Chats', 'People', 'Invitations'];
-
   @override
   void initState() {
     super.initState();
@@ -47,15 +48,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
       _invitationNotificationSub =
           context.read<RealtimeService>().invitationStream.listen((invitation) {
-        if (!mounted || !invitation.isPending) {
-          return;
-        }
-
-        final sender = invitation.sender?.username ?? 'Someone';
+        if (!mounted || !invitation.isPending) return;
+        final sender = invitation.sender?.username ?? 'Ai đó';
         final text = invitation.isFriendInvitation
-            ? '$sender sent you a friend request'
-            : '$sender invited you to a group';
-
+            ? '$sender đã gửi cho bạn lời mời kết bạn'
+            : '$sender đã mời bạn vào nhóm';
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
@@ -63,14 +60,10 @@ class _HomeScreenState extends State<HomeScreen> {
               content: Text(text),
               duration: const Duration(seconds: 3),
               action: SnackBarAction(
-                label: 'View',
+                label: 'Xem',
                 onPressed: () {
-                  if (!mounted) {
-                    return;
-                  }
-                  setState(() {
-                    _tabIndex = 2;
-                  });
+                  if (!mounted) return;
+                  setState(() => _tabIndex = 2);
                 },
               ),
             ),
@@ -79,10 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       _profileSub =
           context.read<RealtimeService>().profileStream.listen((profile) {
-        if (!mounted) {
-          return;
-        }
-
+        if (!mounted) return;
         context.read<AuthProvider>().applyProfileRealtime(profile);
         context.read<ChatRoomsProvider>().applyUserProfileUpdate(profile);
         context.read<UserSearchProvider>().applyUserProfileUpdate(profile);
@@ -100,84 +90,295 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  void _onTabSelected(int index) {
+    if (index == 4) {
+      // Settings tab
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const SettingsScreen()),
+      );
+      return;
+    }
+    if (index == 3) {
+      // Groups / Create group shortcut
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+      );
+      return;
+    }
+    if (index == 1) {
+      // AI Chat tab
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AiChatScreen()),
+      );
+      return;
+    }
+    _invitationProvider?.setInvitesViewActive(index == 2);
+    setState(() => _tabIndex = index);
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final invitationProvider = context.watch<InvitationProvider>();
     final pendingInvites = invitationProvider.pendingCount;
 
+    // Tab titles
+    final tabTitles = ['Trò chuyện', 'Trợ lý AI', 'Thông báo'];
+    final title = _tabIndex < tabTitles.length ? tabTitles[_tabIndex] : '';
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _tabTitles[_tabIndex],
-          style: const TextStyle(fontWeight: FontWeight.w800),
-        ),
-        actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const ProfileScreen(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.manage_accounts_outlined),
-            tooltip: 'Profile',
-          ),
-          if (_tabIndex == 0)
-            IconButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const CreateGroupScreen(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.group_add),
-              tooltip: 'Create group',
-            ),
-          if (_tabIndex == 0)
-            IconButton(
-              onPressed: () {
-                context.read<AuthProvider>().logout();
-              },
-              icon: const Icon(Icons.logout_rounded),
-              tooltip: 'Logout ${auth.displayName}',
-            ),
-        ],
-      ),
+      backgroundColor: AppColors.bgDark,
+      appBar: _buildAppBar(title, auth, pendingInvites),
       body: IndexedStack(index: _tabIndex, children: _tabs),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tabIndex,
-        onDestinationSelected: (index) {
-          _invitationProvider?.setInvitesViewActive(index == 2);
-          setState(() => _tabIndex = index);
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AiChatScreen()),
+          );
         },
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Chats',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
-            label: 'People',
-          ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: pendingInvites > 0,
-              label: Text(pendingInvites > 99 ? '99+' : '$pendingInvites'),
-              child: const Icon(Icons.notifications_outlined),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        highlightElevation: 0,
+        child: Image.asset('lib/assets/chat_bot_icon.png', width: 64, height: 64),
+      ),
+      bottomNavigationBar: _buildBottomNav(pendingInvites),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(
+      String title, AuthProvider auth, int pendingInvites) {
+    return AppBar(
+      backgroundColor: AppColors.bgDark,
+      elevation: 0,
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 26,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.5,
+        ),
+      ),
+      actions: [
+        if (_tabIndex == 0) ...[
+          // Menu button
+          Theme(
+            data: Theme.of(context).copyWith(
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
             ),
-            selectedIcon: Badge(
-              isLabelVisible: pendingInvites > 0,
-              label: Text(pendingInvites > 99 ? '99+' : '$pendingInvites'),
-              child: const Icon(Icons.notifications),
+            child: PopupMenuButton<int>(
+              icon: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.bgInput,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Icon(Icons.add, color: AppColors.textPrimary, size: 20),
+              ),
+              offset: const Offset(0, 48),
+              color: AppColors.bgCard,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              onSelected: (value) {
+                if (value == 0) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AddFriendScreen()),
+                  );
+                } else if (value == 1) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+                  );
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 0,
+                  child: Row(
+                    children: [
+                      Image.asset('lib/assets/add_friend_icon.png', width: 24, height: 24),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Thêm bạn',
+                        style: TextStyle(color: AppColors.textPrimary),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 1,
+                  child: Row(
+                    children: [
+                      Image.asset('lib/assets/add_group_icon.png', width: 24, height: 24),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Tạo nhóm',
+                        style: TextStyle(color: AppColors.textPrimary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            label: 'Invites',
           ),
         ],
+        if (_tabIndex != 0) const SizedBox(width: 8),
+      ],
+    );
+  }
+
+  Widget _buildBottomNav(int pendingInvites) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.bgCard,
+        border: Border(
+          top: BorderSide(color: AppColors.border, width: 0.5),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 64,
+          child: Row(
+            children: [
+              _NavItem(
+                icon: Icons.chat_bubble_outline_rounded,
+                activeIcon: Icons.chat_bubble_rounded,
+                label: 'Trò chuyện',
+                index: 0,
+                currentIndex: _tabIndex,
+                onTap: _onTabSelected,
+              ),
+              _NavItem(
+                icon: Icons.smart_toy_outlined,
+                activeIcon: Icons.smart_toy_rounded,
+                label: 'Trợ lý AI',
+                index: 1,
+                currentIndex: _tabIndex,
+                onTap: _onTabSelected,
+              ),
+              _NavItem(
+                icon: Icons.notifications_outlined,
+                activeIcon: Icons.notifications_rounded,
+                label: 'Thông báo',
+                index: 2,
+                currentIndex: _tabIndex,
+                onTap: _onTabSelected,
+                badge: pendingInvites > 0
+                    ? (pendingInvites > 99 ? '99+' : '$pendingInvites')
+                    : null,
+              ),
+              _NavItem(
+                icon: Icons.group_outlined,
+                activeIcon: Icons.group_rounded,
+                label: 'Nhóm',
+                index: 3,
+                currentIndex: _tabIndex,
+                onTap: _onTabSelected,
+              ),
+              _NavItem(
+                icon: Icons.settings_outlined,
+                activeIcon: Icons.settings_rounded,
+                label: 'Cài đặt',
+                index: 4,
+                currentIndex: _tabIndex,
+                onTap: _onTabSelected,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────── Sub-widgets ───────────────────────────
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final int index;
+  final int currentIndex;
+  final void Function(int) onTap;
+  final String? badge;
+
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.index,
+    required this.currentIndex,
+    required this.onTap,
+    this.badge,
+  });
+
+  bool get _isSelected => index == currentIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onTap(index),
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    _isSelected ? activeIcon : icon,
+                    key: ValueKey(_isSelected),
+                    color: _isSelected
+                        ? AppColors.navSelected
+                        : AppColors.navUnselected,
+                    size: 24,
+                  ),
+                ),
+                if (badge != null)
+                  Positioned(
+                    top: -5,
+                    right: -8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: AppColors.unread,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        badge!,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: TextStyle(
+                color: _isSelected
+                    ? AppColors.navSelected
+                    : AppColors.navUnselected,
+                fontSize: 10,
+                fontWeight:
+                    _isSelected ? FontWeight.w600 : FontWeight.w400,
+              ),
+              child: Text(label),
+            ),
+          ],
+        ),
       ),
     );
   }

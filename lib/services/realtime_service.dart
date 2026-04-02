@@ -10,6 +10,7 @@ import '../models/message_receive_model.dart';
 import '../models/user_block_status_model.dart';
 import '../models/user_with_avatar_model.dart';
 import '../models/user_presence_model.dart';
+import 'api_client.dart';
 import 'token_storage_service.dart';
 
 class InvitationReplyEvent {
@@ -307,13 +308,15 @@ class ReadStatusEvent {
 }
 
 class RealtimeService {
-  RealtimeService(this._tokenStorage);
+  RealtimeService(this._tokenStorage, this._apiClient);
 
   final TokenStorageService _tokenStorage;
+  final ApiClient _apiClient;
 
   StompClient? _client;
   bool _isConnected = false;
   bool _isConnecting = false;
+  bool _isReconnecting = false;
 
   final Set<int> _requestedRooms = {};
   final Set<int> _activeRoomSubscriptions = {};
@@ -425,6 +428,11 @@ class RealtimeService {
       return;
     }
 
+    // Try to refresh the access token proactively before opening the socket.
+    // This ensures we always connect with a valid token, even if the stored
+    // one has already expired while the app was in the background.
+    await _apiClient.refreshAccessToken();
+
     final accessToken = await _tokenStorage.getAccessToken();
     if (accessToken == null || accessToken.isEmpty) {
       return;
@@ -435,7 +443,11 @@ class RealtimeService {
     _client = StompClient(
       config: StompConfig.sockJS(
         url: '${AppConstants.baseUrl}/socket',
-        reconnectDelay: const Duration(seconds: 4),
+        // Disable the library's built-in reconnect. It would reuse the same
+        // (possibly expired) token that was captured when StompClient was
+        // created. We manage reconnects manually via reconnectWithFreshToken()
+        // so each attempt gets a freshly-refreshed token.
+        reconnectDelay: Duration.zero,
         stompConnectHeaders: {
           'Authorization': 'Bearer $accessToken',
         },
@@ -445,6 +457,7 @@ class RealtimeService {
         onConnect: (_) {
           _isConnected = true;
           _isConnecting = false;
+          _isReconnecting = false;
           _activeRoomSubscriptions.clear();
           _activeTypingSubscriptions.clear();
           _activeReadSubscriptions.clear();
@@ -472,13 +485,20 @@ class RealtimeService {
           _activeRoomSubscriptions.clear();
           _activeTypingSubscriptions.clear();
           _activeReadSubscriptions.clear();
+          // Schedule a manual reconnect with a fresh token after a short delay.
+          Future<void>.delayed(const Duration(seconds: 4))
+              .then((_) => reconnectWithFreshToken());
         },
-        onStompError: (_) {
+        onStompError: (frame) {
           _isConnected = false;
           _isConnecting = false;
           _activeRoomSubscriptions.clear();
           _activeTypingSubscriptions.clear();
           _activeReadSubscriptions.clear();
+          // Schedule reconnect regardless of error type so the client
+          // always recovers with a refreshed token.
+          Future<void>.delayed(const Duration(seconds: 4))
+              .then((_) => reconnectWithFreshToken());
         },
         onDisconnect: (_) {
           _isConnected = false;
@@ -490,6 +510,22 @@ class RealtimeService {
     );
 
     _client!.activate();
+  }
+
+  /// Refreshes the access token then opens a new WebSocket connection.
+  /// Called manually whenever the connection drops or the server rejects
+  /// the current token (e.g. Jwt expired).
+  Future<void> reconnectWithFreshToken() async {
+    if (_isReconnecting) return;
+    _isReconnecting = true;
+    // Tear down the old client first.
+    _client?.deactivate();
+    _client = null;
+    _isConnected = false;
+    _isConnecting = false;
+    // connect() will call refreshAccessToken() internally before re-connecting.
+    _isReconnecting = false;
+    await connect();
   }
 
   void disconnect() {

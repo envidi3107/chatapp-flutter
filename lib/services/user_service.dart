@@ -65,6 +65,7 @@ class UserService {
   Future<UserWithAvatarModel> updateMyProfile({
     required String displayName,
     XFile? avatar,
+    String? language,
   }) async {
     Future<List<http.MultipartFile>> buildFiles() async {
       if (avatar == null) {
@@ -81,11 +82,14 @@ class UserService {
       ];
     }
 
+    final fields = <String, String>{'displayName': displayName};
+    if (language != null) {
+      fields['language'] = language;
+    }
+
     final streamed = await _apiClient.putMultipart(
       '/api/v1/users/me/',
-      fields: {
-        'displayName': displayName,
-      },
+      fields: fields,
       buildFiles: buildFiles,
     );
 

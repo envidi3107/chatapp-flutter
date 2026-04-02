@@ -9,6 +9,7 @@ import 'providers/invitation_provider.dart';
 import 'providers/user_search_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'services/api_client.dart';
 import 'services/auth_service.dart';
 import 'services/chat_room_service.dart';
 import 'services/group_chat_service.dart';
@@ -42,11 +43,11 @@ class _MessengerAppState extends State<MessengerApp> {
     return MaterialApp(
       title: 'Messenger App',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
+      theme: AppTheme.dark,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.dark,
       home: auth.isLoading
-          ? const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            )
+          ? const _SplashScreen()
           : auth.isAuthenticated
               ? const HomeScreen()
               : const LoginScreen(),
@@ -54,7 +55,52 @@ class _MessengerAppState extends State<MessengerApp> {
   }
 }
 
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.bgDark,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: const Icon(
+                Icons.smart_toy_rounded,
+                color: Colors.white,
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 List<SingleChildWidget> createAppProviders({
+  required ApiClient apiClient,
   required AuthService authService,
   required ChatRoomService chatRoomService,
   required GroupChatService groupChatService,
@@ -66,6 +112,7 @@ List<SingleChildWidget> createAppProviders({
   required TokenStorageService tokenStorage,
 }) {
   return [
+    Provider.value(value: apiClient),
     Provider.value(value: authService),
     Provider.value(value: chatRoomService),
     Provider.value(value: groupChatService),

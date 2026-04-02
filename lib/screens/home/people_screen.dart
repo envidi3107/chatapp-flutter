@@ -39,17 +39,17 @@ class _PeopleScreenState extends State<PeopleScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Remove friend'),
+          title: const Text('Xoá bạn bè'),
           content: const Text(
-              'This will remove this friend and chat room. Continue?'),
+              'Hành động này sẽ xoá người bạn và cuộc trò chuyện tương ứng. Tiếp tục?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: const Text('Huỷ'),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Remove'),
+              child: const Text('Xoá'),
             ),
           ],
         );
@@ -72,7 +72,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Friend removed')),
+        const SnackBar(content: Text('Đã xoá bạn bè')),
       );
     } catch (e) {
       if (!mounted) {
@@ -80,7 +80,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Remove friend failed: $e')),
+        SnackBar(content: Text('Xoá bạn thất bại: $e')),
       );
     }
   }
@@ -144,7 +144,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
       }
 
       messenger.showSnackBar(
-        SnackBar(content: Text('Blocked @$username')),
+        SnackBar(content: Text('Đã chặn @$username')),
       );
     } catch (e) {
       if (!mounted) {
@@ -152,7 +152,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
       }
 
       messenger.showSnackBar(
-        SnackBar(content: Text('Block user failed: $e')),
+        SnackBar(content: Text('Chặn người dùng thất bại: $e')),
       );
     }
   }
@@ -169,7 +169,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
       }
 
       messenger.showSnackBar(
-        SnackBar(content: Text('Unblocked @$username')),
+        SnackBar(content: Text('Đã bỏ chặn @$username')),
       );
     } catch (e) {
       if (!mounted) {
@@ -177,7 +177,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
       }
 
       messenger.showSnackBar(
-        SnackBar(content: Text('Unblock user failed: $e')),
+        SnackBar(content: Text('Bỏ chặn thất bại: $e')),
       );
     }
   }
@@ -199,12 +199,12 @@ class _PeopleScreenState extends State<PeopleScreen> {
             children: [
               ListTile(
                 leading: const Icon(Icons.person_add_alt_1),
-                title: const Text('Send friend request'),
+                title: const Text('Gửi lời mời kết bạn'),
                 onTap: () => Navigator.pop(context, 'friend'),
               ),
               ListTile(
                 leading: const Icon(Icons.group_add),
-                title: const Text('Invite to group'),
+                title: const Text('Mời vào nhóm'),
                 onTap: () => Navigator.pop(context, 'group'),
               ),
             ],
@@ -228,7 +228,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Friend request sent')),
+          const SnackBar(content: Text('Đã gửi lời mời kết bạn')),
         );
       } catch (e) {
         if (!mounted) {
@@ -236,7 +236,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Send invitation failed: $e')),
+          SnackBar(content: Text('Gửi lời mời thất bại: $e')),
         );
       }
       return;
@@ -248,25 +248,25 @@ class _PeopleScreenState extends State<PeopleScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Invite to group'),
+          title: const Text('Mời vào nhóm'),
           content: TextField(
             controller: controller,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
-              hintText: 'Enter chatGroupId',
+              hintText: 'Nhập ID nhóm chat (ChatGroupId)',
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: const Text('Huỷ'),
             ),
             FilledButton(
               onPressed: () {
                 final id = int.tryParse(controller.text.trim());
                 Navigator.pop(context, id);
               },
-              child: const Text('Send'),
+              child: const Text('Gửi'),
             ),
           ],
         );
@@ -288,7 +288,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invitation sent')),
+        const SnackBar(content: Text('Đã gửi lời mời')),
       );
     } catch (e) {
       if (!mounted) {
@@ -296,7 +296,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Send invitation failed: $e')),
+        SnackBar(content: Text('Gửi lời mời thất bại: $e')),
       );
     }
   }
@@ -339,7 +339,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
             controller: _searchController,
             onChanged: _onSearchChanged,
             decoration: const InputDecoration(
-              hintText: 'Search users and friends',
+              hintText: 'Tìm kiếm người dùng và bạn bè',
               prefixIcon: Icon(Icons.search),
             ),
           ),
@@ -352,7 +352,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                 const Padding(
                   padding: EdgeInsets.fromLTRB(14, 6, 14, 6),
                   child: Text(
-                    'Friends',
+                    'Bạn bè',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 15,
@@ -394,12 +394,12 @@ class _PeopleScreenState extends State<PeopleScreen> {
                       itemBuilder: (context) => [
                         const PopupMenuItem<String>(
                           value: 'remove',
-                          child: Text('Remove friend'),
+                          child: Text('Xoá bạn bè'),
                         ),
                         PopupMenuItem<String>(
                           value: isBlocked ? 'unblock' : 'block',
                           child:
-                              Text(isBlocked ? 'Unblock user' : 'Block user'),
+                              Text(isBlocked ? 'Bỏ chặn' : 'Chặn người dùng'),
                         ),
                       ],
                       icon: const Icon(Icons.more_vert),
@@ -410,7 +410,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
-                      'No friends match this search.',
+                      'Không tìm thấy bạn bè nào khớp.',
                       style: TextStyle(color: Colors.black54),
                     ),
                   ),
@@ -425,7 +425,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                 const Padding(
                   padding: EdgeInsets.fromLTRB(14, 4, 14, 6),
                   child: Text(
-                    'Blocked users',
+                    'Người dùng đã chặn',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 15,
@@ -441,7 +441,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
               const Padding(
                 padding: EdgeInsets.fromLTRB(14, 4, 14, 6),
                 child: Text(
-                  'Find people',
+                  'Tìm người',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
@@ -452,7 +452,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 26),
                   child: Center(
-                    child: Text('Type to search users, friends, and chats'),
+                    child: Text('Gõ để tìm kiếm người dùng và bạn bè'),
                   ),
                 )
               else if (!provider.isLoading && provider.users.isEmpty)
@@ -460,7 +460,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 26),
                   child: Center(
                     child: Text(
-                        'No users found for "${_searchController.text.trim()}".'),
+                        'Không tìm thấy người dùng cho "${_searchController.text.trim()}".'),
                   ),
                 )
               else
@@ -484,11 +484,11 @@ class _PeopleScreenState extends State<PeopleScreen> {
                           onPressed: user.username == null || isBlocked
                               ? null
                               : () => _inviteUser(user.username!),
-                          child: const Text('Invite'),
+                          child: const Text('Mời'),
                         ),
                         const SizedBox(width: 6),
                         IconButton(
-                          tooltip: isBlocked ? 'Unblock user' : 'Block user',
+                          tooltip: isBlocked ? 'Bỏ chặn' : 'Chặn người dùng',
                           onPressed: username.isEmpty
                               ? null
                               : () {

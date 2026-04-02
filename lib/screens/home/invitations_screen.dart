@@ -66,7 +66,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
           ? ListView(
               children: const [
                 SizedBox(height: 120),
-                Center(child: Text('No invitations or notifications')),
+                Center(child: Text('Không có lời mời hoặc thông báo nào')),
               ],
             )
           : ListView(
@@ -75,7 +75,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                   const Padding(
                     padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
                     child: Text(
-                      'Group notifications',
+                      'Thông báo nhóm',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         color: Colors.black54,
@@ -99,10 +99,10 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         subtitle: Text(
-                          '${notification.addedBy} added you to this group.',
+                          '${notification.addedBy} đã thêm bạn vào nhóm này.',
                         ),
                         trailing: IconButton(
-                          tooltip: 'Dismiss',
+                          tooltip: 'Bỏ qua',
                           onPressed: () {
                             provider.removeGroupAddedNotification(notification);
                           },
@@ -116,7 +116,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                   const Padding(
                     padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
                     child: Text(
-                      'Invitations',
+                      'Lời mời',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         color: Colors.black54,
@@ -124,7 +124,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                     ),
                   ),
                   ...provider.items.map((item) {
-                    final senderName = item.sender?.displayLabel ?? 'Unknown';
+                    final senderName = item.sender?.displayLabel ?? 'Không rõ';
 
                     return Card(
                       margin: const EdgeInsets.symmetric(
@@ -153,7 +153,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    'Room #${item.chatRoomId ?? '-'}',
+                                    'Phòng #${item.chatRoomId ?? '-'}',
                                     style:
                                         TextStyle(color: Colors.grey.shade700),
                                   ),
