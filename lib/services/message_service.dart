@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../models/message_receive_model.dart';
+import '../models/message_translation_model.dart';
 import 'api_client.dart';
 
 class MessageService {
@@ -139,5 +140,42 @@ class MessageService {
     if (response.statusCode != 204) {
       throw Exception('Set read status failed: ${response.body}');
     }
+  }
+
+  Future<MessageTranslationModel> translateMessageToVietnamese({
+    required String text,
+    String sourceLanguage = 'auto',
+    List<String> previousMessages = const [],
+  }) async {
+    final normalizedText = text.trim();
+    if (normalizedText.isEmpty) {
+      throw Exception('Translate message failed: empty text');
+    }
+
+    final normalizedContext = previousMessages
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+
+    final response = await _apiClient.postJson(
+      '/api/v1/messages/translate',
+      {
+        'text': normalizedText,
+        'targetLanguage': 'vi',
+        'sourceLanguage': sourceLanguage,
+        if (normalizedContext.isNotEmpty) 'previousMessages': normalizedContext,
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Translate message failed: ${response.body}');
+    }
+
+    final body = jsonDecode(utf8.decode(response.bodyBytes));
+    if (body is! Map<String, dynamic>) {
+      throw Exception('Translate message failed: invalid response');
+    }
+
+    return MessageTranslationModel.fromJson(body);
   }
 }
