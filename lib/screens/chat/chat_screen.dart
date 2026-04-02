@@ -1,11 +1,13 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:record/record.dart';
 
 import '../../core/app_theme.dart';
 
@@ -72,6 +74,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _picker = ImagePicker();
+  final _audioRecorder = AudioRecorder();
 
   List<XFile> _pickedFiles = [];
   ChatRoomsProvider? _chatRoomsProvider;
@@ -100,8 +103,10 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   bool _blockedByMe = false;
   bool _blockedByPeer = false;
   bool _isNavigatingBackToChatList = false;
+  bool _isVoiceRecording = false;
   bool? _isPeerOnline;
   DateTime? _lastSeenAt;
+  DateTime? _voiceRecordingStartedAt;
   late String _roomDisplayName;
   int? _lastSyncedMessageId;
   bool _didInitialAutoScroll = false;
@@ -153,6 +158,10 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     _groupMemberRemovedSub?.cancel();
     _typingSub?.cancel();
     _readSub?.cancel();
+    if (_isVoiceRecording) {
+      unawaited(_audioRecorder.stop());
+    }
+    unawaited(_audioRecorder.dispose());
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -222,7 +231,10 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }
 
   void _subscribeReadStatus() {
-    _readSub = context.read<RealtimeService>().roomReadStream(widget.roomId).listen((event) {
+    _readSub = context
+        .read<RealtimeService>()
+        .roomReadStream(widget.roomId)
+        .listen((event) {
       final reader = event.reader;
       final username = reader?.username ?? '';
       if (!mounted || username.isEmpty || username == _myUsername) {
@@ -242,8 +254,13 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }
 
   void _subscribeRoomRemoved() {
-    _roomRemovedSub = context.read<RealtimeService>().friendRemovedStream.listen((event) async {
-      if (!mounted || _isNavigatingBackToChatList || event.roomId != widget.roomId) {
+    _roomRemovedSub = context
+        .read<RealtimeService>()
+        .friendRemovedStream
+        .listen((event) async {
+      if (!mounted ||
+          _isNavigatingBackToChatList ||
+          event.roomId != widget.roomId) {
         return;
       }
 
@@ -348,8 +365,10 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }
 
   void _subscribeGroupMemberRemoved() {
-    _groupMemberRemovedSub =
-        context.read<RealtimeService>().groupMemberRemovedStream.listen((event) {
+    _groupMemberRemovedSub = context
+        .read<RealtimeService>()
+        .groupMemberRemovedStream
+        .listen((event) {
       if (!mounted || event.roomId != widget.roomId) {
         return;
       }
@@ -370,7 +389,9 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
 
       _showGroupMemberNotice(
         text: text,
-        type: isLeft ? _GroupSystemNoticeType.left : _GroupSystemNoticeType.removed,
+        type: isLeft
+            ? _GroupSystemNoticeType.left
+            : _GroupSystemNoticeType.removed,
       );
 
       unawaited(context.read<ChatRoomsProvider>().loadRooms());
@@ -383,12 +404,18 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }) {
     final messenger = ScaffoldMessenger.of(context);
     final (icon, backgroundColor) = switch (type) {
-      _GroupSystemNoticeType.added =>
-        (Icons.person_add_alt_1_rounded, const Color(0xFF0B6BCB)),
-      _GroupSystemNoticeType.removed =>
-        (Icons.person_remove_alt_1_rounded, const Color(0xFFB54708)),
-      _GroupSystemNoticeType.left =>
-        (Icons.logout_rounded, const Color(0xFF0D7A43)),
+      _GroupSystemNoticeType.added => (
+          Icons.person_add_alt_1_rounded,
+          const Color(0xFF0B6BCB)
+        ),
+      _GroupSystemNoticeType.removed => (
+          Icons.person_remove_alt_1_rounded,
+          const Color(0xFFB54708)
+        ),
+      _GroupSystemNoticeType.left => (
+          Icons.logout_rounded,
+          const Color(0xFF0D7A43)
+        ),
     };
 
     messenger.hideCurrentSnackBar();
@@ -452,7 +479,10 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }
 
   void _subscribeTyping() {
-    _typingSub = context.read<RealtimeService>().roomTypingStream(widget.roomId).listen((event) {
+    _typingSub = context
+        .read<RealtimeService>()
+        .roomTypingStream(widget.roomId)
+        .listen((event) {
       if (!mounted || event.sender == _myUsername) {
         return;
       }
@@ -590,7 +620,8 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
       return;
     }
 
-    _presenceSub = context.read<RealtimeService>().presenceStream.listen((event) {
+    _presenceSub =
+        context.read<RealtimeService>().presenceStream.listen((event) {
       final presence = event.presence;
       if (presence == null || presence.username != peer || !mounted) {
         return;
@@ -609,7 +640,8 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
       return;
     }
 
-    _profileSub = context.read<RealtimeService>().profileStream.listen((profile) {
+    _profileSub =
+        context.read<RealtimeService>().profileStream.listen((profile) {
       final username = (profile.username ?? '').trim();
       if (!mounted || username != peer) {
         return;
@@ -660,7 +692,8 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
       return;
     }
 
-    _blockStatusSub = context.read<RealtimeService>().blockStatusStream.listen((event) {
+    _blockStatusSub =
+        context.read<RealtimeService>().blockStatusStream.listen((event) {
       if (!mounted || event.username != peer) {
         return;
       }
@@ -673,6 +706,41 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }
 
   bool get _isMessagingBlocked => _blockedByMe || _blockedByPeer;
+
+  bool get _isVoiceInputSupported {
+    if (kIsWeb) {
+      return true;
+    }
+
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.windows;
+  }
+
+  RecordConfig _voiceRecordConfig() {
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows) {
+      return const RecordConfig(
+        encoder: AudioEncoder.wav,
+        sampleRate: 16000,
+        numChannels: 1,
+      );
+    }
+
+    return const RecordConfig(
+      encoder: AudioEncoder.aacLc,
+      sampleRate: 16000,
+      numChannels: 1,
+      bitRate: 64000,
+    );
+  }
+
+  String _voiceInputHint() {
+    if (_isVoiceInputSupported) {
+      return 'Nhấn và giữ nút micro để ghi âm';
+    }
+
+    return 'Thiết bị hiện tại chưa hỗ trợ ghi âm. Hãy dùng Android, iOS hoặc Windows.';
+  }
 
   String? _blockedBannerText() {
     if (!_isMessagingBlocked) {
@@ -718,8 +786,9 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   String _formatLastSeen(DateTime value) {
     final seenAt = value.toLocal();
     final now = DateTime.now();
-    final isToday =
-        seenAt.year == now.year && seenAt.month == now.month && seenAt.day == now.day;
+    final isToday = seenAt.year == now.year &&
+        seenAt.month == now.month &&
+        seenAt.day == now.day;
     if (isToday) {
       return 'hôm nay lúc ${DateFormat('HH:mm').format(seenAt)}';
     }
@@ -736,7 +805,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }
 
   Future<void> _pickImage() async {
-    if (_isMessagingBlocked) {
+    if (_isMessagingBlocked || _isVoiceRecording) {
       return;
     }
 
@@ -751,7 +820,12 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }
 
   Future<void> _send() async {
-    if (_isMessagingBlocked) {
+    if (_isMessagingBlocked || _isVoiceRecording) {
+      return;
+    }
+
+    final chatProvider = context.read<ChatProvider>();
+    if (chatProvider.isTranscribingSpeech) {
       return;
     }
 
@@ -760,10 +834,10 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
       return;
     }
 
-    final sent = await context.read<ChatProvider>().sendMessage(
-          text: text,
-          attachments: _pickedFiles,
-        );
+    final sent = await chatProvider.sendMessage(
+      text: text,
+      attachments: _pickedFiles,
+    );
 
     if (!mounted) {
       return;
@@ -792,6 +866,159 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     _scrollToBottom(animated: true);
   }
 
+  Future<void> _startVoiceRecording() async {
+    if (!_isVoiceInputSupported || _isMessagingBlocked || _isVoiceRecording) {
+      return;
+    }
+
+    final chatProvider = context.read<ChatProvider>();
+    if (chatProvider.isSending || chatProvider.isTranscribingSpeech) {
+      return;
+    }
+
+    try {
+      final hasPermission = await _audioRecorder.hasPermission();
+      if (!hasPermission) {
+        if (!mounted) {
+          return;
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Ứng dụng cần quyền micro để chuyển giọng nói thành văn bản'),
+          ),
+        );
+        return;
+      }
+
+      final recordConfig = _voiceRecordConfig();
+      final extension =
+          (kIsWeb || defaultTargetPlatform == TargetPlatform.windows)
+              ? 'wav'
+              : 'm4a';
+      final path = kIsWeb
+          ? 'voice_${DateTime.now().millisecondsSinceEpoch}.$extension'
+          : '${(await getTemporaryDirectory()).path}/voice_${DateTime.now().millisecondsSinceEpoch}.$extension';
+
+      await _audioRecorder.start(
+        recordConfig,
+        path: path,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isVoiceRecording = true;
+        _voiceRecordingStartedAt = DateTime.now();
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể bắt đầu ghi âm: $e')),
+      );
+    }
+  }
+
+  Future<String?> _stopVoiceRecording({required bool discard}) async {
+    if (!_isVoiceRecording) {
+      return null;
+    }
+
+    String? recordedPath;
+    try {
+      recordedPath = await _audioRecorder.stop();
+    } catch (_) {
+      recordedPath = null;
+    }
+
+    final startedAt = _voiceRecordingStartedAt;
+    if (mounted) {
+      setState(() {
+        _isVoiceRecording = false;
+        _voiceRecordingStartedAt = null;
+      });
+    }
+
+    if (discard) {
+      return null;
+    }
+
+    if (startedAt != null) {
+      final duration = DateTime.now().difference(startedAt);
+      if (duration < const Duration(milliseconds: 400)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Giữ nút lâu hơn để ghi âm')),
+          );
+        }
+        return null;
+      }
+    }
+
+    if (recordedPath == null || recordedPath.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không lấy được file ghi âm')),
+        );
+      }
+      return null;
+    }
+
+    return recordedPath;
+  }
+
+  Future<void> _cancelVoiceRecording() async {
+    await _stopVoiceRecording(discard: true);
+  }
+
+  Future<void> _finishVoiceRecordingAndSend() async {
+    final recordedPath = await _stopVoiceRecording(discard: false);
+    if (recordedPath == null || !mounted) {
+      return;
+    }
+
+    final chatProvider = context.read<ChatProvider>();
+    final transcribed = await chatProvider.transcribeSpeech(
+      filePath: recordedPath,
+      language: 'vi',
+      prompt: 'Đây là hội thoại tiếng Việt trong ứng dụng chat.',
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (transcribed == null) {
+      final error = chatProvider.error ?? 'Nhận dạng giọng nói thất bại';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      return;
+    }
+
+    final sent = await chatProvider.sendMessage(text: transcribed);
+    if (!mounted) {
+      return;
+    }
+
+    if (!sent) {
+      final error = chatProvider.error ?? 'Gửi tin nhắn giọng nói thất bại';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      return;
+    }
+
+    await Future.delayed(const Duration(milliseconds: 150));
+    _scrollToBottom(animated: true);
+  }
+
   List<String> _collectTranslationContext({
     required int messageIndex,
     required List<MessageReceiveModel> messages,
@@ -799,7 +1026,9 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     const maxContextMessages = 6;
     final context = <String>[];
 
-    for (var i = messageIndex - 1; i >= 0 && context.length < maxContextMessages; i--) {
+    for (var i = messageIndex - 1;
+        i >= 0 && context.length < maxContextMessages;
+        i--) {
       final item = messages[i];
       if (_groupSystemNoticeFromMessage(item) != null) {
         continue;
@@ -810,18 +1039,22 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
         continue;
       }
 
-      final sender = (item.senderProfile?.displayLabel ?? item.sender ?? '').trim();
+      final sender =
+          (item.senderProfile?.displayLabel ?? item.sender ?? '').trim();
       context.add(sender.isEmpty ? text : '$sender: $text');
     }
 
     return context.reversed.toList(growable: false);
   }
 
-  List<String> _collectRecentSummaryMessages(List<MessageReceiveModel> messages) {
+  List<String> _collectRecentSummaryMessages(
+      List<MessageReceiveModel> messages) {
     const maxMessages = 30;
     final collected = <String>[];
 
-    for (var i = messages.length - 1; i >= 0 && collected.length < maxMessages; i--) {
+    for (var i = messages.length - 1;
+        i >= 0 && collected.length < maxMessages;
+        i--) {
       final item = messages[i];
       if (_groupSystemNoticeFromMessage(item) != null) {
         continue;
@@ -832,14 +1065,16 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
         continue;
       }
 
-      final sender = (item.senderProfile?.displayLabel ?? item.sender ?? '').trim();
+      final sender =
+          (item.senderProfile?.displayLabel ?? item.sender ?? '').trim();
       collected.add(sender.isEmpty ? text : '$sender: $text');
     }
 
     return collected.reversed.toList(growable: false);
   }
 
-  Future<void> _summarizeRecentMessages(List<MessageReceiveModel> messages) async {
+  Future<void> _summarizeRecentMessages(
+      List<MessageReceiveModel> messages) async {
     final payload = _collectRecentSummaryMessages(messages);
     if (payload.isEmpty) {
       if (!mounted) {
@@ -847,15 +1082,16 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không có tin nhắn văn bản gần đây để tóm tắt')),
+        const SnackBar(
+            content: Text('Không có tin nhắn văn bản gần đây để tóm tắt')),
       );
       return;
     }
 
     final summary = await context.read<ChatProvider>().summarizeRecentMessages(
-      messages: payload,
-      roomName: _roomDisplayName,
-    );
+          messages: payload,
+          roomName: _roomDisplayName,
+        );
 
     if (!mounted) {
       return;
@@ -909,11 +1145,11 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     );
 
     final translated = await context.read<ChatProvider>().translateMessage(
-      messageId: messageId,
-      originalText: text,
-      previousMessages: previousMessages,
-      forceRefresh: forceRefresh,
-    );
+          messageId: messageId,
+          originalText: text,
+          previousMessages: previousMessages,
+          forceRefresh: forceRefresh,
+        );
 
     if (!mounted || translated) {
       return;
@@ -988,63 +1224,62 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
       context: context,
       builder: (sheetContext) {
         return SafeArea(
-child: Column(
-  mainAxisSize: MainAxisSize.min,
-  children: [
-    if (canTranslate)
-      ListTile(
-        leading: isTranslating
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.translate_rounded),
-        title: Text(
-          isTranslating
-              ? 'Đang dịch sang tiếng Việt...'
-              : translatedText == null
-                  ? 'Dịch sang tiếng Việt'
-                  : 'Dịch lại sang tiếng Việt',
-        ),
-        onTap: isTranslating
-            ? null
-            : () {
-                Navigator.pop(sheetContext);
-                unawaited(_translateMessage(
-                  message: message,
-                  messageIndex: messageIndex,
-                  messages: messages,
-                  forceRefresh: translatedText != null,
-                ));
-              },
-      ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (canTranslate)
+                ListTile(
+                  leading: isTranslating
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.translate_rounded),
+                  title: Text(
+                    isTranslating
+                        ? 'Đang dịch sang tiếng Việt...'
+                        : translatedText == null
+                            ? 'Dịch sang tiếng Việt'
+                            : 'Dịch lại sang tiếng Việt',
+                  ),
+                  onTap: isTranslating
+                      ? null
+                      : () {
+                          Navigator.pop(sheetContext);
+                          unawaited(_translateMessage(
+                            message: message,
+                            messageIndex: messageIndex,
+                            messages: messages,
+                            forceRefresh: translatedText != null,
+                          ));
+                        },
+                ),
+              if (canDelete)
+                ListTile(
+                  leading: const Icon(Icons.delete_outline),
+                  title: const Text('Xóa tin nhắn'),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
 
-    if (canDelete)
-      ListTile(
-        leading: const Icon(Icons.delete_outline),
-        title: const Text('Xóa tin nhắn'),
-        onTap: () async {
-          Navigator.pop(sheetContext);
+                    final deleted =
+                        await context.read<ChatProvider>().recallMessage(
+                              messageId: messageId,
+                            );
 
-          final deleted =
-              await context.read<ChatProvider>().recallMessage(
-                    messageId: messageId,
-                  );
+                    if (!mounted) return;
 
-          if (!mounted) return;
-
-          if (!deleted) {
-            final error =
-                context.read<ChatProvider>().error ?? 'Xóa thất bại';
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(error)),
-            );
-          }
-        },
-      ),
-  ],
-),
+                    if (!deleted) {
+                      final error =
+                          context.read<ChatProvider>().error ?? 'Xóa thất bại';
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(error)),
+                      );
+                    }
+                  },
+                ),
+            ],
+          ),
         );
       },
     );
@@ -1061,11 +1296,16 @@ child: Column(
         : null;
     final isOnline = _isPeerOnline == true;
     final messages = chat.messages;
-    final isGroupRoom = widget.peerUsername == null || widget.peerUsername!.isEmpty;
+    final isGroupRoom =
+        widget.peerUsername == null || widget.peerUsername!.isEmpty;
+    final voiceStatusLabel = _isVoiceRecording
+        ? 'Đang ghi âm... thả tay để gửi'
+        : (chat.isTranscribingSpeech ? 'Đang nhận dạng giọng nói...' : null);
 
     final senderProfiles = <String, UserWithAvatarModel>{};
     for (final item in messages) {
-      final username = (item.sender ?? item.senderProfile?.username ?? '').trim();
+      final username =
+          (item.sender ?? item.senderProfile?.username ?? '').trim();
       if (username.isEmpty) {
         continue;
       }
@@ -1082,7 +1322,8 @@ child: Column(
     final ownMessageIndexes = <int>[];
     for (var i = 0; i < messages.length; i++) {
       final item = messages[i];
-      final senderUsername = (item.sender ?? item.senderProfile?.username ?? '').trim();
+      final senderUsername =
+          (item.sender ?? item.senderProfile?.username ?? '').trim();
       if (myUsername != null && senderUsername == myUsername) {
         ownMessageIndexes.add(i);
       }
@@ -1211,10 +1452,7 @@ child: Column(
         return '';
       }
 
-      return (message.sender ??
-              message.senderProfile?.username ??
-              '')
-          .trim();
+      return (message.sender ?? message.senderProfile?.username ?? '').trim();
     }
 
     return Scaffold(
@@ -1240,7 +1478,9 @@ child: Column(
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isOnline ? AppColors.online : AppColors.textSecondary,
+                            color: isOnline
+                                ? AppColors.online
+                                : AppColors.textSecondary,
                           ),
                     ),
                 ],
@@ -1310,44 +1550,51 @@ child: Column(
                 : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: timelineItems.length,
+                    itemCount: timelineItems.length,
                     itemBuilder: (context, index) {
-                    final timeline = timelineItems[index];
-                    final messageIndex = timeline.messageIndex!;
-                    final item = messages[messageIndex];
-                    final systemNotice = _groupSystemNoticeFromMessage(item);
-                    if (systemNotice != null) {
-                    return _GroupSystemNoticeTile(notice: systemNotice);
-                    }
+                      final timeline = timelineItems[index];
+                      final messageIndex = timeline.messageIndex!;
+                      final item = messages[messageIndex];
+                      final systemNotice = _groupSystemNoticeFromMessage(item);
+                      if (systemNotice != null) {
+                        return _GroupSystemNoticeTile(notice: systemNotice);
+                      }
 
                       final senderUsername =
-                          (item.sender ?? item.senderProfile?.username ?? '').trim();
-                      final isMine = myUsername != null && senderUsername == myUsername;
+                          (item.sender ?? item.senderProfile?.username ?? '')
+                              .trim();
+                      final isMine =
+                          myUsername != null && senderUsername == myUsername;
                       final senderProfile = senderProfiles[senderUsername];
 
-                    final previousSender = senderAtTimelineIndex(index - 1);
-                    final nextSender = senderAtTimelineIndex(index + 1);
-                      final isStartSenderBlock = senderUsername != previousSender;
+                      final previousSender = senderAtTimelineIndex(index - 1);
+                      final nextSender = senderAtTimelineIndex(index + 1);
+                      final isStartSenderBlock =
+                          senderUsername != previousSender;
                       final isEndSenderBlock = senderUsername != nextSender;
                       const firstMessageGap = 4.0;
                       const differentSenderGap = 18.0;
                       const sameSenderGap = 1.0;
                       final bubbleTopSpacing = isStartSenderBlock
-                      ? (messageIndex == 0 ? firstMessageGap : differentSenderGap)
+                          ? (messageIndex == 0
+                              ? firstMessageGap
+                              : differentSenderGap)
                           : sameSenderGap;
 
                       final seenByAvatars = isMine
-                      ? (seenByAvatarsByIndex[messageIndex] ?? const <SeenAvatarInfo>[])
+                          ? (seenByAvatarsByIndex[messageIndex] ??
+                              const <SeenAvatarInfo>[])
                           : const <SeenAvatarInfo>[];
 
                       String? deliveryStatus;
-                    if (isMine && messageIndex == lastOwnIndex) {
+                      if (isMine && messageIndex == lastOwnIndex) {
                         deliveryStatus = seenByAvatars.isNotEmpty
                             ? '\u0110\u00e3 xem'
                             : '\u0110\u00e3 g\u1eedi';
                       }
 
-                      final translatedText = chat.translatedTextForMessage(item.id);
+                      final translatedText =
+                          chat.translatedTextForMessage(item.id);
                       final isTranslating = chat.isTranslatingMessage(item.id);
 
                       return MessageBubble(
@@ -1357,10 +1604,13 @@ child: Column(
                         translatedText: translatedText,
                         isTranslating: isTranslating,
                         seenByAvatars: seenByAvatars,
-                        senderName: senderProfile?.displayLabel ?? senderUsername,
+                        senderName:
+                            senderProfile?.displayLabel ?? senderUsername,
                         senderAvatarUrl: senderProfile?.avatar?.source,
-                        showSenderName: !isMine && isGroupRoom && isStartSenderBlock,
-                        showSenderAvatar: !isMine && (!isGroupRoom || isEndSenderBlock),
+                        showSenderName:
+                            !isMine && isGroupRoom && isStartSenderBlock,
+                        showSenderAvatar:
+                            !isMine && (!isGroupRoom || isEndSenderBlock),
                         reserveSenderAvatarSpace: !isMine && isGroupRoom,
                         topSpacing: bubbleTopSpacing,
                         onLongPress: () => _openMessageActions(
@@ -1437,7 +1687,8 @@ child: Column(
               ),
               child: Text(
                 blockedBannerText,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                style: const TextStyle(
+                    color: AppColors.textSecondary, fontSize: 13),
               ),
             ),
           AnimatedContainer(
@@ -1450,9 +1701,41 @@ child: Column(
                 : Text(
                     typingLabel,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.primary,
+                          color: AppColors.primary,
                           fontStyle: FontStyle.italic,
                         ),
+                  ),
+          ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            height: voiceStatusLabel == null ? 0 : 22,
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: voiceStatusLabel == null
+                ? null
+                : Row(
+                    children: [
+                      if (chat.isTranscribingSpeech)
+                        const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        const Icon(
+                          Icons.mic,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
+                      const SizedBox(width: 6),
+                      Text(
+                        voiceStatusLabel,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                              fontStyle: FontStyle.italic,
+                            ),
+                      ),
+                    ],
                   ),
           ),
           SafeArea(
@@ -1463,7 +1746,9 @@ child: Column(
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: _isMessagingBlocked ? null : _pickImage,
+                    onPressed: _isMessagingBlocked || _isVoiceRecording
+                        ? null
+                        : _pickImage,
                     icon: const Icon(Icons.image_rounded),
                     color: AppColors.primary,
                   ),
@@ -1479,12 +1764,15 @@ child: Column(
                       style: const TextStyle(color: AppColors.textPrimary),
                       decoration: InputDecoration(
                         hintText: 'Nhập tin nhắn...',
-                        hintStyle: const TextStyle(color: AppColors.textSecondary),
+                        hintStyle:
+                            const TextStyle(color: AppColors.textSecondary),
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
                         suffixIcon: Padding(
                           padding: const EdgeInsets.all(10.0),
-                          child: Image.asset('lib/assets/emoij_icon.png', width: 22, height: 22),
+                          child: Image.asset('lib/assets/emoij_icon.png',
+                              width: 22, height: 22),
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(20),
@@ -1496,13 +1784,77 @@ child: Column(
                     ),
                   ),
                   const SizedBox(width: 6),
-                  IconButton(
-                    onPressed: () {},
-                    icon: Image.asset('lib/assets/microphone.png', width: 24, height: 24, color: AppColors.textPrimary),
+                  GestureDetector(
+                    onTap: () {
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          SnackBar(
+                            content: Text(_voiceInputHint()),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                    },
+                    onLongPressStart: (!_isVoiceInputSupported ||
+                            _isMessagingBlocked ||
+                            chat.isSending ||
+                            chat.isTranscribingSpeech)
+                        ? null
+                        : (_) {
+                            unawaited(_startVoiceRecording());
+                          },
+                    onLongPressEnd: _isVoiceRecording
+                        ? (_) {
+                            unawaited(_finishVoiceRecordingAndSend());
+                          }
+                        : null,
+                    onLongPressCancel: _isVoiceRecording
+                        ? () {
+                            unawaited(_cancelVoiceRecording());
+                          }
+                        : null,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: _isVoiceRecording
+                            ? AppColors.primary.withOpacity(0.2)
+                            : AppColors.bgInput,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _isVoiceRecording
+                              ? AppColors.primary
+                              : AppColors.border,
+                        ),
+                      ),
+                      child: Center(
+                        child: chat.isTranscribingSpeech
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Image.asset(
+                                'lib/assets/microphone.png',
+                                width: 20,
+                                height: 20,
+                                color: _isVoiceRecording
+                                    ? AppColors.primary
+                                    : AppColors.textPrimary,
+                              ),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 2),
                   IconButton.filled(
-                    onPressed: chat.isSending || _isMessagingBlocked ? null : _send,
+                    onPressed: chat.isSending ||
+                            chat.isTranscribingSpeech ||
+                            _isVoiceRecording ||
+                            _isMessagingBlocked
+                        ? null
+                        : _send,
                     style: IconButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       padding: const EdgeInsets.all(10),
@@ -1570,8 +1922,14 @@ class _GroupSystemNoticeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, color) = switch (notice.type) {
-      _GroupSystemNoticeType.added => (Icons.person_add_alt_1_rounded, AppColors.primary),
-      _GroupSystemNoticeType.removed => (Icons.person_remove_alt_1_rounded, Colors.orangeAccent),
+      _GroupSystemNoticeType.added => (
+          Icons.person_add_alt_1_rounded,
+          AppColors.primary
+        ),
+      _GroupSystemNoticeType.removed => (
+          Icons.person_remove_alt_1_rounded,
+          Colors.orangeAccent
+        ),
       _GroupSystemNoticeType.left => (Icons.logout_rounded, AppColors.online),
     };
 

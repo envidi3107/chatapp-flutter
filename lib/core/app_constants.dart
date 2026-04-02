@@ -11,12 +11,17 @@ class AppConstants {
       return _baseUrlFromEnv;
     }
 
-    // Chrome should call localhost directly; Android emulator uses 10.0.2.2.
+    // Web and desktop/simulator targets should call localhost directly.
     if (kIsWeb) {
       return 'http://localhost:8080';
     }
 
-    return 'http://10.0.2.2:8080';
+    // Android emulator cannot access host localhost directly.
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8080';
+    }
+
+    return 'http://localhost:8080';
   }
 
   static const String accessTokenKey = 'access_token';

@@ -30,6 +30,7 @@ class ChatProvider extends ChangeNotifier {
 
   bool _isLoading = false;
   bool _isSending = false;
+  bool _isTranscribingSpeech = false;
   bool _isSummarizing = false;
   String? _error;
   List<MessageReceiveModel> _messages = const [];
@@ -40,6 +41,7 @@ class ChatProvider extends ChangeNotifier {
 
   bool get isLoading => _isLoading;
   bool get isSending => _isSending;
+  bool get isTranscribingSpeech => _isTranscribingSpeech;
   bool get isSummarizing => _isSummarizing;
   String? get error => _error;
   List<MessageReceiveModel> get messages => _messages;
@@ -117,6 +119,45 @@ class ChatProvider extends ChangeNotifier {
       return false;
     } finally {
       _isSending = false;
+      notifyListeners();
+    }
+  }
+
+  Future<String?> transcribeSpeech({
+    required String filePath,
+    String language = 'vi',
+    String? prompt,
+  }) async {
+    final normalizedPath = filePath.trim();
+    if (normalizedPath.isEmpty) {
+      _error = 'Speech-to-text failed: invalid audio file';
+      notifyListeners();
+      return null;
+    }
+
+    _isTranscribingSpeech = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final text = await _messageService.transcribeSpeech(
+        audioFile: XFile(normalizedPath),
+        language: language,
+        prompt: prompt,
+      );
+
+      final normalizedText = text.trim();
+      if (normalizedText.isEmpty) {
+        _error = 'Speech-to-text failed: empty transcription';
+        return null;
+      }
+
+      return normalizedText;
+    } catch (e) {
+      _error = e.toString();
+      return null;
+    } finally {
+      _isTranscribingSpeech = false;
       notifyListeners();
     }
   }
@@ -270,7 +311,8 @@ class ChatProvider extends ChangeNotifier {
         }
 
         final originalText = (value['originalText'] ?? '').toString().trim();
-        final translatedText = (value['translatedText'] ?? '').toString().trim();
+        final translatedText =
+            (value['translatedText'] ?? '').toString().trim();
         if (originalText.isEmpty || translatedText.isEmpty) {
           return;
         }
@@ -324,7 +366,8 @@ class ChatProvider extends ChangeNotifier {
       if (_persistedTranslations.length > _maxPersistedTranslations) {
         final sortedIds = _persistedTranslations.keys.toList()
           ..sort((a, b) => a.compareTo(b));
-        final overflow = _persistedTranslations.length - _maxPersistedTranslations;
+        final overflow =
+            _persistedTranslations.length - _maxPersistedTranslations;
         for (var i = 0; i < overflow; i++) {
           _persistedTranslations.remove(sortedIds[i]);
         }
@@ -346,7 +389,8 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void _pruneTranslationState() {
-    final existingIds = _messages.map((item) => item.id).whereType<int>().toSet();
+    final existingIds =
+        _messages.map((item) => item.id).whereType<int>().toSet();
     _translatedByMessageId.removeWhere((id, _) => !existingIds.contains(id));
     _translatingMessageIds.removeWhere((id) => !existingIds.contains(id));
   }

@@ -143,6 +143,56 @@ class MessageService {
     }
   }
 
+  Future<String> transcribeSpeech({
+    required XFile audioFile,
+    String language = 'vi',
+    String? prompt,
+  }) async {
+    final normalizedLanguage = language.trim().isEmpty ? 'vi' : language.trim();
+    final normalizedPrompt = (prompt ?? '').trim();
+
+    Future<List<http.MultipartFile>> buildFiles() async {
+      final bytes = await audioFile.readAsBytes();
+      final filename = audioFile.name.trim().isEmpty
+          ? 'voice_${DateTime.now().millisecondsSinceEpoch}.m4a'
+          : audioFile.name.trim();
+
+      return [
+        http.MultipartFile.fromBytes(
+          'audio',
+          bytes,
+          filename: filename,
+        ),
+      ];
+    }
+
+    final streamed = await _apiClient.postMultipart(
+      '/api/v1/speech-to-text',
+      fields: {
+        'language': normalizedLanguage,
+        if (normalizedPrompt.isNotEmpty) 'prompt': normalizedPrompt,
+      },
+      buildFiles: buildFiles,
+    );
+
+    final payload = await streamed.stream.bytesToString();
+    if (streamed.statusCode != 200) {
+      throw Exception('Speech-to-text failed: $payload');
+    }
+
+    final decoded = jsonDecode(payload);
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception('Speech-to-text failed: invalid response');
+    }
+
+    final text = (decoded['text'] ?? '').toString().trim();
+    if (text.isEmpty) {
+      throw Exception('Speech-to-text failed: empty transcription');
+    }
+
+    return text;
+  }
+
   Future<MessageTranslationModel> translateMessageToVietnamese({
     required String text,
     String sourceLanguage = 'auto',
