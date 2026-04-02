@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -814,6 +815,80 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     return context.reversed.toList(growable: false);
   }
 
+  List<String> _collectRecentSummaryMessages(List<MessageReceiveModel> messages) {
+    const maxMessages = 30;
+    final collected = <String>[];
+
+    for (var i = messages.length - 1; i >= 0 && collected.length < maxMessages; i--) {
+      final item = messages[i];
+      if (_groupSystemNoticeFromMessage(item) != null) {
+        continue;
+      }
+
+      final text = (item.message ?? '').trim();
+      if (text.isEmpty) {
+        continue;
+      }
+
+      final sender = (item.senderProfile?.displayLabel ?? item.sender ?? '').trim();
+      collected.add(sender.isEmpty ? text : '$sender: $text');
+    }
+
+    return collected.reversed.toList(growable: false);
+  }
+
+  Future<void> _summarizeRecentMessages(List<MessageReceiveModel> messages) async {
+    final payload = _collectRecentSummaryMessages(messages);
+    if (payload.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không có tin nhắn văn bản gần đây để tóm tắt')),
+      );
+      return;
+    }
+
+    final summary = await context.read<ChatProvider>().summarizeRecentMessages(
+      messages: payload,
+      roomName: _roomDisplayName,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (summary == null) {
+      final error = context.read<ChatProvider>().error ?? 'Summarize failed';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+          content: SingleChildScrollView(
+            child: MarkdownBody(
+              data: summary,
+              selectable: true,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Đóng'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _translateMessage({
     required MessageReceiveModel message,
     required int messageIndex,
@@ -1188,6 +1263,23 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
                 }
                 _syncRoomDisplayNameFromRoomList();
               },
+            ),
+          if (chat.isSummarizing)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.summarize_rounded),
+              tooltip: 'Tóm tắt tin nhắn gần đây',
+              onPressed: messages.isEmpty
+                  ? null
+                  : () => _summarizeRecentMessages(messages),
             ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),

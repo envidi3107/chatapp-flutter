@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../models/message_receive_model.dart';
+import '../models/message_summary_model.dart';
 import '../models/message_translation_model.dart';
 import 'api_client.dart';
 
@@ -177,5 +178,40 @@ class MessageService {
     }
 
     return MessageTranslationModel.fromJson(body);
+  }
+
+  Future<MessageSummaryModel> summarizeRecentMessages({
+    required List<String> messages,
+    String? roomName,
+  }) async {
+    final normalizedMessages = messages
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+
+    if (normalizedMessages.isEmpty) {
+      throw Exception('Summarize failed: no messages');
+    }
+
+    final normalizedRoomName = (roomName ?? '').trim();
+
+    final response = await _apiClient.postJson(
+      '/api/v1/messages/summarize',
+      {
+        'messages': normalizedMessages,
+        if (normalizedRoomName.isNotEmpty) 'roomName': normalizedRoomName,
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Summarize failed: ${response.body}');
+    }
+
+    final body = jsonDecode(utf8.decode(response.bodyBytes));
+    if (body is! Map<String, dynamic>) {
+      throw Exception('Summarize failed: invalid response');
+    }
+
+    return MessageSummaryModel.fromJson(body);
   }
 }

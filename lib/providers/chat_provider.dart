@@ -30,6 +30,7 @@ class ChatProvider extends ChangeNotifier {
 
   bool _isLoading = false;
   bool _isSending = false;
+  bool _isSummarizing = false;
   String? _error;
   List<MessageReceiveModel> _messages = const [];
   final Map<int, String> _translatedByMessageId = {};
@@ -39,6 +40,7 @@ class ChatProvider extends ChangeNotifier {
 
   bool get isLoading => _isLoading;
   bool get isSending => _isSending;
+  bool get isSummarizing => _isSummarizing;
   String? get error => _error;
   List<MessageReceiveModel> get messages => _messages;
 
@@ -182,6 +184,36 @@ class ChatProvider extends ChangeNotifier {
       return false;
     } finally {
       _translatingMessageIds.remove(messageId);
+      notifyListeners();
+    }
+  }
+
+  Future<String?> summarizeRecentMessages({
+    required List<String> messages,
+    String? roomName,
+  }) async {
+    _error = null;
+    _isSummarizing = true;
+    notifyListeners();
+
+    try {
+      final result = await _messageService.summarizeRecentMessages(
+        messages: messages,
+        roomName: roomName,
+      );
+
+      final summary = result.summary.trim();
+      if (summary.isEmpty) {
+        _error = 'Summarize failed: empty summary';
+        return null;
+      }
+
+      return summary;
+    } catch (e) {
+      _error = e.toString();
+      return null;
+    } finally {
+      _isSummarizing = false;
       notifyListeners();
     }
   }
