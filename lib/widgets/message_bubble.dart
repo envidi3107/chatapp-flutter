@@ -23,6 +23,8 @@ class MessageBubble extends StatelessWidget {
     required this.isMine,
     required this.onLongPress,
     this.deliveryStatus,
+    this.translatedText,
+    this.isTranslating = false,
     this.seenByAvatars = const [],
     this.senderName,
     this.senderAvatarUrl,
@@ -36,6 +38,8 @@ class MessageBubble extends StatelessWidget {
   final bool isMine;
   final VoidCallback onLongPress;
   final String? deliveryStatus;
+  final String? translatedText;
+  final bool isTranslating;
   final List<SeenAvatarInfo> seenByAvatars;
   final String? senderName;
   final String? senderAvatarUrl;
@@ -91,6 +95,8 @@ class MessageBubble extends StatelessWidget {
         .toList();
     final hasText = (message.message ?? '').isNotEmpty;
     final hasVisibleImages = imageUrls.isNotEmpty;
+    final normalizedTranslatedText = (translatedText ?? '').trim();
+    final hasTranslatedText = normalizedTranslatedText.isNotEmpty;
     final senderLabel = (senderName ?? '').trim().isEmpty
         ? (message.sender ?? 'User')
         : senderName!.trim();
@@ -206,6 +212,78 @@ class MessageBubble extends StatelessWidget {
                               fontStyle: FontStyle.italic,
                             ),
                           ),
+                        if (isTranslating) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    isMine ? Colors.white70 : Colors.black54,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Dang dich sang tieng Viet...',
+                                style: TextStyle(
+                                  color: isMine ? Colors.white70 : Colors.black54,
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (!isTranslating && hasTranslatedText) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isMine
+                                  ? Colors.white.withOpacity(0.18)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isMine
+                                    ? Colors.white.withOpacity(0.35)
+                                    : const Color(0xFFD5D9E0),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: isMine
+                                  ? CrossAxisAlignment.end
+                                  : CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Ban dich tieng Viet',
+                                  style: TextStyle(
+                                    color: isMine ? Colors.white70 : Colors.black54,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  normalizedTranslatedText,
+                                  style: TextStyle(
+                                    color: isMine ? Colors.white : Colors.black87,
+                                    fontSize: 14,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         if (sentOn != null) ...[
                           const SizedBox(height: 4),
                           Text(

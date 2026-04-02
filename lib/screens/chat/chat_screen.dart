@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -79,7 +80,6 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   StreamSubscription<UserWithAvatarModel>? _profileSub;
   StreamSubscription<UserBlockStatusModel>? _blockStatusSub;
   StreamSubscription<FriendRemovedEvent>? _roomRemovedSub;
-  StreamSubscription<GroupUpdatedEvent>? _groupUpdatedSub;
   StreamSubscription<GroupMembersAddedEvent>? _groupMembersAddedSub;
   StreamSubscription<GroupMemberRemovedEvent>? _groupMemberRemovedSub;
   StreamSubscription<TypingStatusEvent>? _typingSub;
@@ -129,7 +129,6 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     _subscribeBlockStatus();
     _subscribeTyping();
     _subscribeReadStatus();
-    _subscribeGroupUpdated();
     _subscribeGroupMembersAdded();
     _subscribeGroupMemberRemoved();
   }
@@ -150,7 +149,6 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     _profileSub?.cancel();
     _blockStatusSub?.cancel();
     _roomRemovedSub?.cancel();
-    _groupUpdatedSub?.cancel();
     _groupMembersAddedSub?.cancel();
     _groupMemberRemovedSub?.cancel();
     _typingSub?.cancel();
@@ -224,10 +222,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }
 
   void _subscribeReadStatus() {
-    _readSub = context
-        .read<RealtimeService>()
-        .roomReadStream(widget.roomId)
-        .listen((event) {
+    _readSub = context.read<RealtimeService>().roomReadStream(widget.roomId).listen((event) {
       final reader = event.reader;
       final username = reader?.username ?? '';
       if (!mounted || username.isEmpty || username == _myUsername) {
@@ -247,17 +242,13 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }
 
   void _subscribeRoomRemoved() {
-    _roomRemovedSub = context
-        .read<RealtimeService>()
-        .friendRemovedStream
-        .listen((event) async {
-      if (!mounted ||
-          _isNavigatingBackToChatList ||
-          event.roomId != widget.roomId) {
+    _roomRemovedSub = context.read<RealtimeService>().friendRemovedStream.listen((event) async {
+      if (!mounted || _isNavigatingBackToChatList || event.roomId != widget.roomId) {
         return;
       }
 
       final messenger = ScaffoldMessenger.of(context);
+      final navigator = Navigator.of(context);
       final roomsProvider = context.read<ChatRoomsProvider>();
       final dissolvedBy = (event.dissolvedBy ?? '').trim();
       final isGroupDissolved = dissolvedBy.isNotEmpty;
@@ -287,8 +278,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
         return;
       }
 
-      // Pop về HomeScreen (Chats) thay vì chỉ pop một màn để tránh trắng
-      _navigateBackToChatList();
+      navigator.pop(true);
     });
   }
 
@@ -332,36 +322,6 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     });
   }
 
-  void _subscribeGroupUpdated() {
-    _groupUpdatedSub =
-        context.read<RealtimeService>().groupUpdatedStream.listen((event) {
-      if (!mounted || event.roomId != widget.roomId) {
-        return;
-      }
-
-      final room = event.chatRoom;
-      if (room == null) {
-        unawaited(context.read<ChatRoomsProvider>().loadRooms().then((_) {
-          if (!mounted) {
-            return;
-          }
-          _syncRoomDisplayNameFromRoomList();
-        }));
-        return;
-      }
-
-      final username = context.read<AuthProvider>().username;
-      final nextName = room.displayNameFor(username).trim();
-      if (nextName.isEmpty || nextName == _roomDisplayName) {
-        return;
-      }
-
-      setState(() {
-        _roomDisplayName = nextName;
-      });
-    });
-  }
-
   void _subscribeGroupMembersAdded() {
     _groupMembersAddedSub =
         context.read<RealtimeService>().groupMembersAddedStream.listen((event) {
@@ -388,10 +348,8 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }
 
   void _subscribeGroupMemberRemoved() {
-    _groupMemberRemovedSub = context
-        .read<RealtimeService>()
-        .groupMemberRemovedStream
-        .listen((event) {
+    _groupMemberRemovedSub =
+        context.read<RealtimeService>().groupMemberRemovedStream.listen((event) {
       if (!mounted || event.roomId != widget.roomId) {
         return;
       }
@@ -412,9 +370,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
 
       _showGroupMemberNotice(
         text: text,
-        type: isLeft
-            ? _GroupSystemNoticeType.left
-            : _GroupSystemNoticeType.removed,
+        type: isLeft ? _GroupSystemNoticeType.left : _GroupSystemNoticeType.removed,
       );
 
       unawaited(context.read<ChatRoomsProvider>().loadRooms());
@@ -427,18 +383,12 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }) {
     final messenger = ScaffoldMessenger.of(context);
     final (icon, backgroundColor) = switch (type) {
-      _GroupSystemNoticeType.added => (
-          Icons.person_add_alt_1_rounded,
-          const Color(0xFF0B6BCB)
-        ),
-      _GroupSystemNoticeType.removed => (
-          Icons.person_remove_alt_1_rounded,
-          const Color(0xFFB54708)
-        ),
-      _GroupSystemNoticeType.left => (
-          Icons.logout_rounded,
-          const Color(0xFF0D7A43)
-        ),
+      _GroupSystemNoticeType.added =>
+        (Icons.person_add_alt_1_rounded, const Color(0xFF0B6BCB)),
+      _GroupSystemNoticeType.removed =>
+        (Icons.person_remove_alt_1_rounded, const Color(0xFFB54708)),
+      _GroupSystemNoticeType.left =>
+        (Icons.logout_rounded, const Color(0xFF0D7A43)),
     };
 
     messenger.hideCurrentSnackBar();
@@ -502,10 +452,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   }
 
   void _subscribeTyping() {
-    _typingSub = context
-        .read<RealtimeService>()
-        .roomTypingStream(widget.roomId)
-        .listen((event) {
+    _typingSub = context.read<RealtimeService>().roomTypingStream(widget.roomId).listen((event) {
       if (!mounted || event.sender == _myUsername) {
         return;
       }
@@ -643,8 +590,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
       return;
     }
 
-    _presenceSub =
-        context.read<RealtimeService>().presenceStream.listen((event) {
+    _presenceSub = context.read<RealtimeService>().presenceStream.listen((event) {
       final presence = event.presence;
       if (presence == null || presence.username != peer || !mounted) {
         return;
@@ -663,8 +609,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
       return;
     }
 
-    _profileSub =
-        context.read<RealtimeService>().profileStream.listen((profile) {
+    _profileSub = context.read<RealtimeService>().profileStream.listen((profile) {
       final username = (profile.username ?? '').trim();
       if (!mounted || username != peer) {
         return;
@@ -715,8 +660,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
       return;
     }
 
-    _blockStatusSub =
-        context.read<RealtimeService>().blockStatusStream.listen((event) {
+    _blockStatusSub = context.read<RealtimeService>().blockStatusStream.listen((event) {
       if (!mounted || event.username != peer) {
         return;
       }
@@ -774,9 +718,8 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   String _formatLastSeen(DateTime value) {
     final seenAt = value.toLocal();
     final now = DateTime.now();
-    final isToday = seenAt.year == now.year &&
-        seenAt.month == now.month &&
-        seenAt.day == now.day;
+    final isToday =
+        seenAt.year == now.year && seenAt.month == now.month && seenAt.day == now.day;
     if (isToday) {
       return 'hôm nay lúc ${DateFormat('HH:mm').format(seenAt)}';
     }
@@ -849,32 +792,259 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     _scrollToBottom(animated: true);
   }
 
+  List<String> _collectTranslationContext({
+    required int messageIndex,
+    required List<MessageReceiveModel> messages,
+  }) {
+    const maxContextMessages = 6;
+    final context = <String>[];
+
+    for (var i = messageIndex - 1; i >= 0 && context.length < maxContextMessages; i--) {
+      final item = messages[i];
+      if (_groupSystemNoticeFromMessage(item) != null) {
+        continue;
+      }
+
+      final text = (item.message ?? '').trim();
+      if (text.isEmpty) {
+        continue;
+      }
+
+      final sender = (item.senderProfile?.displayLabel ?? item.sender ?? '').trim();
+      context.add(sender.isEmpty ? text : '$sender: $text');
+    }
+
+    return context.reversed.toList(growable: false);
+  }
+
+  List<String> _collectRecentSummaryMessages(List<MessageReceiveModel> messages) {
+    const maxMessages = 30;
+    final collected = <String>[];
+
+    for (var i = messages.length - 1; i >= 0 && collected.length < maxMessages; i--) {
+      final item = messages[i];
+      if (_groupSystemNoticeFromMessage(item) != null) {
+        continue;
+      }
+
+      final text = (item.message ?? '').trim();
+      if (text.isEmpty) {
+        continue;
+      }
+
+      final sender = (item.senderProfile?.displayLabel ?? item.sender ?? '').trim();
+      collected.add(sender.isEmpty ? text : '$sender: $text');
+    }
+
+    return collected.reversed.toList(growable: false);
+  }
+
+  Future<void> _summarizeRecentMessages(List<MessageReceiveModel> messages) async {
+    final payload = _collectRecentSummaryMessages(messages);
+    if (payload.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không có tin nhắn văn bản gần đây để tóm tắt')),
+      );
+      return;
+    }
+
+    final summary = await context.read<ChatProvider>().summarizeRecentMessages(
+      messages: payload,
+      roomName: _roomDisplayName,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (summary == null) {
+      final error = context.read<ChatProvider>().error ?? 'Summarize failed';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+          content: SingleChildScrollView(
+            child: MarkdownBody(
+              data: summary,
+              selectable: true,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Đóng'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _translateMessage({
+    required MessageReceiveModel message,
+    required int messageIndex,
+    required List<MessageReceiveModel> messages,
+    required bool forceRefresh,
+  }) async {
+    final messageId = message.id;
+    final text = (message.message ?? '').trim();
+    if (messageId == null || text.isEmpty) {
+      return;
+    }
+
+    final previousMessages = _collectTranslationContext(
+      messageIndex: messageIndex,
+      messages: messages,
+    );
+
+    final translated = await context.read<ChatProvider>().translateMessage(
+      messageId: messageId,
+      originalText: text,
+      previousMessages: previousMessages,
+      forceRefresh: forceRefresh,
+    );
+
+    if (!mounted || translated) {
+      return;
+    }
+
+    final error = context.read<ChatProvider>().error ?? 'Translate failed';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(error)),
+    );
+  }
+
+  Future<void> _deleteMessage(int messageId) async {
+    final deleted = await context.read<ChatProvider>().recallMessage(
+          messageId: messageId,
+        );
+
+    if (!mounted || deleted) {
+      return;
+    }
+
+    final error = context.read<ChatProvider>().error ?? 'Delete failed';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(error)),
+    );
+  }
+
   void _confirmRecall(int messageId) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete message'),
+          content: const Text('This message will be recalled for everyone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                unawaited(_deleteMessage(messageId));
+              },
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _openMessageActions({
+    required MessageReceiveModel message,
+    required bool isMine,
+    required int messageIndex,
+    required List<MessageReceiveModel> messages,
+  }) {
+    final messageId = message.id;
+    final canDelete = isMine && messageId != null;
+    final hasText = (message.message ?? '').trim().isNotEmpty;
+    final canTranslate = messageId != null && hasText;
+
+    if (!canDelete && !canTranslate) {
+      return;
+    }
+
+    final chat = context.read<ChatProvider>();
+    final translatedText = chat.translatedTextForMessage(messageId);
+    final isTranslating = chat.isTranslatingMessage(messageId);
+
     showModalBottomSheet<void>(
       context: context,
-      builder: (context) {
+      builder: (sheetContext) {
         return SafeArea(
-          child: ListTile(
-            leading: const Icon(Icons.delete_outline),
-            title: const Text('Xóa tin nhắn'),
-            onTap: () async {
-              Navigator.pop(context);
-              final deleted =
-                  await this.context.read<ChatProvider>().recallMessage(
-                        messageId: messageId,
-                      );
-              if (!mounted) {
-                return;
-              }
+child: Column(
+  mainAxisSize: MainAxisSize.min,
+  children: [
+    if (canTranslate)
+      ListTile(
+        leading: isTranslating
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.translate_rounded),
+        title: Text(
+          isTranslating
+              ? 'Đang dịch sang tiếng Việt...'
+              : translatedText == null
+                  ? 'Dịch sang tiếng Việt'
+                  : 'Dịch lại sang tiếng Việt',
+        ),
+        onTap: isTranslating
+            ? null
+            : () {
+                Navigator.pop(sheetContext);
+                unawaited(_translateMessage(
+                  message: message,
+                  messageIndex: messageIndex,
+                  messages: messages,
+                  forceRefresh: translatedText != null,
+                ));
+              },
+      ),
 
-              if (!deleted) {
-                final error =
-                    this.context.read<ChatProvider>().error ?? 'Xóa thất bại';
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  SnackBar(content: Text(error)),
-                );
-              }
-            },
+    if (canDelete)
+      ListTile(
+        leading: const Icon(Icons.delete_outline),
+        title: const Text('Xóa tin nhắn'),
+        onTap: () async {
+          Navigator.pop(sheetContext);
+
+          final deleted =
+              await context.read<ChatProvider>().recallMessage(
+                    messageId: messageId,
+                  );
+
+          if (!mounted) return;
+
+          if (!deleted) {
+            final error =
+                context.read<ChatProvider>().error ?? 'Xóa thất bại';
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(error)),
+            );
+          }
+        },
+      ),
+  ],
+),
           ),
         );
       },
@@ -892,13 +1062,11 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
         : null;
     final isOnline = _isPeerOnline == true;
     final messages = chat.messages;
-    final isGroupRoom =
-        widget.peerUsername == null || widget.peerUsername!.isEmpty;
+    final isGroupRoom = widget.peerUsername == null || widget.peerUsername!.isEmpty;
 
     final senderProfiles = <String, UserWithAvatarModel>{};
     for (final item in messages) {
-      final username =
-          (item.sender ?? item.senderProfile?.username ?? '').trim();
+      final username = (item.sender ?? item.senderProfile?.username ?? '').trim();
       if (username.isEmpty) {
         continue;
       }
@@ -915,8 +1083,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     final ownMessageIndexes = <int>[];
     for (var i = 0; i < messages.length; i++) {
       final item = messages[i];
-      final senderUsername =
-          (item.sender ?? item.senderProfile?.username ?? '').trim();
+      final senderUsername = (item.sender ?? item.senderProfile?.username ?? '').trim();
       if (myUsername != null && senderUsername == myUsername) {
         ownMessageIndexes.add(i);
       }
@@ -1045,7 +1212,10 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
         return '';
       }
 
-      return (message.sender ?? message.senderProfile?.username ?? '').trim();
+      return (message.sender ??
+              message.senderProfile?.username ??
+              '')
+          .trim();
     }
 
     return Scaffold(
@@ -1071,7 +1241,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: isOnline
+                        color: isOnline
                                 ? const Color(0xFF0A8F47)
                                 : Colors.black54,
                           ),
@@ -1122,6 +1292,23 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
                 _syncRoomDisplayNameFromRoomList();
               },
             ),
+          if (chat.isSummarizing)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.summarize_rounded),
+              tooltip: 'Tóm tắt tin nhắn gần đây',
+              onPressed: messages.isEmpty
+                  ? null
+                  : () => _summarizeRecentMessages(messages),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             onPressed: chat.loadMessages,
@@ -1136,68 +1323,65 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
                 : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: timelineItems.length,
+                  itemCount: timelineItems.length,
                     itemBuilder: (context, index) {
-                      final timeline = timelineItems[index];
-                      final messageIndex = timeline.messageIndex!;
-                      final item = messages[messageIndex];
-                      final systemNotice = _groupSystemNoticeFromMessage(item);
-                      if (systemNotice != null) {
-                        return _GroupSystemNoticeTile(notice: systemNotice);
-                      }
+                    final timeline = timelineItems[index];
+                    final messageIndex = timeline.messageIndex!;
+                    final item = messages[messageIndex];
+                    final systemNotice = _groupSystemNoticeFromMessage(item);
+                    if (systemNotice != null) {
+                    return _GroupSystemNoticeTile(notice: systemNotice);
+                    }
 
                       final senderUsername =
-                          (item.sender ?? item.senderProfile?.username ?? '')
-                              .trim();
-                      final isMine =
-                          myUsername != null && senderUsername == myUsername;
+                          (item.sender ?? item.senderProfile?.username ?? '').trim();
+                      final isMine = myUsername != null && senderUsername == myUsername;
                       final senderProfile = senderProfiles[senderUsername];
 
-                      final previousSender = senderAtTimelineIndex(index - 1);
-                      final nextSender = senderAtTimelineIndex(index + 1);
-                      final isStartSenderBlock =
-                          senderUsername != previousSender;
+                    final previousSender = senderAtTimelineIndex(index - 1);
+                    final nextSender = senderAtTimelineIndex(index + 1);
+                      final isStartSenderBlock = senderUsername != previousSender;
                       final isEndSenderBlock = senderUsername != nextSender;
                       const firstMessageGap = 4.0;
                       const differentSenderGap = 18.0;
                       const sameSenderGap = 1.0;
                       final bubbleTopSpacing = isStartSenderBlock
-                          ? (messageIndex == 0
-                              ? firstMessageGap
-                              : differentSenderGap)
+                      ? (messageIndex == 0 ? firstMessageGap : differentSenderGap)
                           : sameSenderGap;
 
                       final seenByAvatars = isMine
-                          ? (seenByAvatarsByIndex[messageIndex] ??
-                              const <SeenAvatarInfo>[])
+                      ? (seenByAvatarsByIndex[messageIndex] ?? const <SeenAvatarInfo>[])
                           : const <SeenAvatarInfo>[];
 
                       String? deliveryStatus;
-                      if (isMine && messageIndex == lastOwnIndex) {
+                    if (isMine && messageIndex == lastOwnIndex) {
                         deliveryStatus = seenByAvatars.isNotEmpty
                             ? '\u0110\u00e3 xem'
                             : '\u0110\u00e3 g\u1eedi';
                       }
 
+                      final translatedText = chat.translatedTextForMessage(item.id);
+                      final isTranslating = chat.isTranslatingMessage(item.id);
+
                       return MessageBubble(
                         message: item,
                         isMine: isMine,
                         deliveryStatus: deliveryStatus,
+                        translatedText: translatedText,
+                        isTranslating: isTranslating,
                         seenByAvatars: seenByAvatars,
-                        senderName:
-                            senderProfile?.displayLabel ?? senderUsername,
+                        senderName: senderProfile?.displayLabel ?? senderUsername,
                         senderAvatarUrl: senderProfile?.avatar?.source,
-                        showSenderName:
-                            !isMine && isGroupRoom && isStartSenderBlock,
-                        showSenderAvatar:
-                            !isMine && (!isGroupRoom || isEndSenderBlock),
+                        showSenderName: !isMine && isGroupRoom && isStartSenderBlock,
+                        showSenderAvatar: !isMine && (!isGroupRoom || isEndSenderBlock),
                         reserveSenderAvatarSpace: !isMine && isGroupRoom,
                         topSpacing: bubbleTopSpacing,
-                        onLongPress: () {
-                          if (item.id != null && isMine) {
-                            _confirmRecall(item.id!);
-                          }
-                        },
+                        onLongPress: () => _openMessageActions(
+                          message: item,
+                          isMine: isMine,
+                          messageIndex: messageIndex,
+                          messages: messages,
+                        ),
                       );
                     },
                   ),
@@ -1331,8 +1515,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
                   ),
                   const SizedBox(width: 2),
                   IconButton.filled(
-                    onPressed:
-                        chat.isSending || _isMessagingBlocked ? null : _send,
+                    onPressed: chat.isSending || _isMessagingBlocked ? null : _send,
                     style: IconButton.styleFrom(
                       backgroundColor: const Color(0xFF168AFF),
                       padding: const EdgeInsets.all(10),
@@ -1400,18 +1583,9 @@ class _GroupSystemNoticeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, color) = switch (notice.type) {
-      _GroupSystemNoticeType.added => (
-          Icons.person_add_alt_1_rounded,
-          const Color(0xFF0B6BCB)
-        ),
-      _GroupSystemNoticeType.removed => (
-          Icons.person_remove_alt_1_rounded,
-          const Color(0xFFB54708)
-        ),
-      _GroupSystemNoticeType.left => (
-          Icons.logout_rounded,
-          const Color(0xFF0D7A43)
-        ),
+      _GroupSystemNoticeType.added => (Icons.person_add_alt_1_rounded, const Color(0xFF0B6BCB)),
+      _GroupSystemNoticeType.removed => (Icons.person_remove_alt_1_rounded, const Color(0xFFB54708)),
+      _GroupSystemNoticeType.left => (Icons.logout_rounded, const Color(0xFF0D7A43)),
     };
 
     return Padding(
