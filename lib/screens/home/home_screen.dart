@@ -32,9 +32,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static const _tabs = [
     ChatListScreen(),
-    PeopleScreen(),
     InvitationsScreen(),
+    PeopleScreen(),
   ];
+
+  int _stackIndexForTab(int tabIndex) {
+    switch (tabIndex) {
+      case 2:
+        return 1;
+      case 3:
+        return 2;
+      case 0:
+      default:
+        return 0;
+    }
+  }
+
+  String _titleForTab(int tabIndex) {
+    switch (tabIndex) {
+      case 2:
+        return 'Thông báo';
+      case 3:
+        return 'Bạn bè';
+      case 0:
+      default:
+        return 'Trò chuyện';
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -97,13 +122,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
-    if (index == 3) {
-      // Groups / Create group shortcut
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
-      );
-      return;
-    }
     if (index == 1) {
       // AI Chat tab
       Navigator.of(context).push(
@@ -121,14 +139,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final invitationProvider = context.watch<InvitationProvider>();
     final pendingInvites = invitationProvider.pendingCount;
 
-    // Tab titles
-    final tabTitles = ['Trò chuyện', 'Trợ lý AI', 'Thông báo'];
-    final title = _tabIndex < tabTitles.length ? tabTitles[_tabIndex] : '';
+    final title = _titleForTab(_tabIndex);
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       appBar: _buildAppBar(title, auth, pendingInvites),
-      body: IndexedStack(index: _tabIndex, children: _tabs),
+      body: IndexedStack(
+        index: _stackIndexForTab(_tabIndex),
+        children: _tabs,
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.of(context).push(
@@ -271,9 +290,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     : null,
               ),
               _NavItem(
-                icon: Icons.group_outlined,
-                activeIcon: Icons.group_rounded,
-                label: 'Nhóm',
+                icon: Icons.people_outline_rounded,
+                activeIcon: Icons.people_rounded,
+                label: 'Bạn bè',
                 index: 3,
                 currentIndex: _tabIndex,
                 onTap: _onTabSelected,

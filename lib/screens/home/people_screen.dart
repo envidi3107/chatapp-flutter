@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_theme.dart';
 import '../../models/chat_room_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_rooms_provider.dart';
@@ -185,6 +186,9 @@ class _PeopleScreenState extends State<PeopleScreen> {
   void _onSearchChanged(String value) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) {
+        return;
+      }
       context.read<UserSearchProvider>().search(value);
     });
   }
@@ -411,7 +415,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
                       'Không tìm thấy bạn bè nào khớp.',
-                      style: TextStyle(color: Colors.black54),
+                      style: TextStyle(color: AppColors.textSecondary),
                     ),
                   ),
                 const Divider(height: 24),
@@ -477,30 +481,47 @@ class _PeopleScreenState extends State<PeopleScreen> {
                     subtitle: username.isNotEmpty && username != displayName
                         ? Text('@$username')
                         : null,
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        FilledButton.tonal(
-                          onPressed: user.username == null || isBlocked
-                              ? null
-                              : () => _inviteUser(user.username!),
-                          child: const Text('Mời'),
-                        ),
-                        const SizedBox(width: 6),
-                        IconButton(
-                          tooltip: isBlocked ? 'Bỏ chặn' : 'Chặn người dùng',
-                          onPressed: username.isEmpty
-                              ? null
-                              : () {
-                                  if (isBlocked) {
-                                    _unblockUser(username);
-                                  } else {
-                                    _blockUser(username);
-                                  }
-                                },
-                          icon: Icon(isBlocked ? Icons.lock_open : Icons.block),
-                        ),
-                      ],
+                    trailing: SizedBox(
+                      width: 112,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          FilledButton.tonal(
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, 34),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 10),
+                              tapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            onPressed: user.username == null || isBlocked
+                                ? null
+                                : () => _inviteUser(user.username!),
+                            child: const Text('Mời'),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            tooltip: isBlocked ? 'Bỏ chặn' : 'Chặn người dùng',
+                            onPressed: username.isEmpty
+                                ? null
+                                : () {
+                                    if (isBlocked) {
+                                      _unblockUser(username);
+                                    } else {
+                                      _blockUser(username);
+                                    }
+                                  },
+                            icon:
+                                Icon(isBlocked ? Icons.lock_open : Icons.block),
+                            iconSize: 20,
+                            constraints:
+                                const BoxConstraints.tightFor(width: 32, height: 32),
+                            padding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 }),

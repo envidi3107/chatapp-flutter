@@ -220,7 +220,7 @@ class _ChatbotViewState extends State<_ChatbotView> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: const Color(0xFF0A8F47),
+                          color: AppColors.online,
                         ),
                   ),
                 ],
@@ -261,7 +261,7 @@ class _ChatbotViewState extends State<_ChatbotView> {
       body: provider.isLoadingConversations && provider.conversations.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : Container(
-              color: Colors.white,
+              color: AppColors.bgDark,
               child: Column(
                 children: [
                   _ConversationSelector(
@@ -317,14 +317,14 @@ class _ChatbotViewState extends State<_ChatbotView> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF1F0),
-                        border: Border.all(color: const Color(0xFFFFCCC7)),
+                        color: AppColors.bgSurface,
+                        border: Border.all(color: const Color(0xFF9F3345)),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         provider.error!,
                         style: const TextStyle(
-                          color: Color(0xFFA8071A),
+                          color: Color(0xFFFFB4C0),
                           fontSize: 12,
                         ),
                       ),
@@ -334,7 +334,7 @@ class _ChatbotViewState extends State<_ChatbotView> {
                         ? const Center(
                             child: Text(
                               'Tạo cuộc trò chuyện mới để bắt đầu với chatbot',
-                              style: TextStyle(color: Colors.black54),
+                              style: TextStyle(color: AppColors.textSecondary),
                             ),
                           )
                         : _MessagesPanel(
@@ -348,7 +348,7 @@ class _ChatbotViewState extends State<_ChatbotView> {
                     top: false,
                     child: Container(
                       padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
-                      color: Colors.white,
+                      color: AppColors.bgCard,
                       child: Row(
                         children: [
                           IconButton(
@@ -364,8 +364,8 @@ class _ChatbotViewState extends State<_ChatbotView> {
                                   : Icons.extension_off_outlined,
                             ),
                             color: provider.useMcp
-                                ? const Color(0xFF168AFF)
-                                : Colors.black54,
+                              ? AppColors.primary
+                              : AppColors.textHint,
                           ),
                           Expanded(
                             child: TextField(
@@ -391,7 +391,7 @@ class _ChatbotViewState extends State<_ChatbotView> {
                                 ? null
                                 : () => _send(provider),
                             style: IconButton.styleFrom(
-                              backgroundColor: const Color(0xFF168AFF),
+                              backgroundColor: AppColors.primary,
                             ),
                             icon: provider.isStreaming
                                 ? const SizedBox(
@@ -444,16 +444,16 @@ class _ConversationSelector extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       decoration: const BoxDecoration(
-        color: Color(0xFFF9FAFB),
+        color: AppColors.bgCard,
         border: Border(
-          bottom: BorderSide(color: Color(0xFFE5E7EB)),
+          bottom: BorderSide(color: AppColors.border),
         ),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              const Icon(Icons.history, size: 18, color: Color(0xFF6B7280)),
+              const Icon(Icons.history, size: 18, color: AppColors.textSecondary),
               const SizedBox(width: 6),
               const Expanded(
                 child: Text(
@@ -461,7 +461,7 @@ class _ConversationSelector extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF111827),
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -508,7 +508,7 @@ class _ConversationSelector extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: Text(
             'Chưa có cuộc trò chuyện chatbot nào',
-            style: TextStyle(color: Colors.black54),
+            style: TextStyle(color: AppColors.textSecondary),
           ),
         ),
       );
@@ -526,7 +526,8 @@ class _ConversationSelector extends StatelessWidget {
           final isActive = activeConversationId == item.id;
 
           return Material(
-            color: isActive ? const Color(0xFFE8F3FF) : Colors.white,
+            color:
+                isActive ? AppColors.primary.withOpacity(0.16) : AppColors.bgInput,
             borderRadius: BorderRadius.circular(10),
             child: InkWell(
               borderRadius: BorderRadius.circular(10),
@@ -546,7 +547,7 @@ class _ConversationSelector extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: const Color(0xFF111827),
+                              color: AppColors.textPrimary,
                               fontSize: 13,
                               fontWeight: isActive
                                   ? FontWeight.w700
@@ -560,7 +561,7 @@ class _ConversationSelector extends StatelessWidget {
                             child: Icon(
                               Icons.extension,
                               size: 14,
-                              color: Color(0xFF168AFF),
+                              color: AppColors.primary,
                             ),
                           ),
                         IconButton(
@@ -572,7 +573,7 @@ class _ConversationSelector extends StatelessWidget {
                           icon: const Icon(
                             Icons.delete_outline,
                             size: 18,
-                            color: Color(0xFFD92D20),
+                            color: Colors.redAccent,
                           ),
                         ),
                       ],
@@ -585,7 +586,7 @@ class _ConversationSelector extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Color(0xFF6B7280),
+                        color: AppColors.textSecondary,
                         fontSize: 12,
                         height: 1.25,
                       ),
@@ -594,7 +595,7 @@ class _ConversationSelector extends StatelessWidget {
                     Text(
                       _formatConversationTimestamp(item.updatedOn ?? item.createdOn),
                       style: const TextStyle(
-                        color: Color(0xFF9CA3AF),
+                        color: AppColors.textHint,
                         fontSize: 11,
                       ),
                     ),
@@ -678,8 +679,8 @@ class _ChatbotBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isUser = role == ChatbotRole.user;
     final alignment = isUser ? Alignment.centerRight : Alignment.centerLeft;
-    final bubbleColor = isUser ? const Color(0xFF168AFF) : const Color(0xFFF3F4F6);
-    final textColor = isUser ? Colors.white : const Color(0xFF111827);
+    final bubbleColor = isUser ? AppColors.primary : AppColors.bgCard;
+    final textColor = isUser ? Colors.white : AppColors.textPrimary;
 
     return Align(
       alignment: alignment,
@@ -689,6 +690,7 @@ class _ChatbotBubble extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: bubbleColor,
+          border: isUser ? null : Border.all(color: AppColors.border),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
@@ -727,7 +729,7 @@ class _ChatbotBubble extends StatelessWidget {
                   ? 'Đang trả lời...'
                   : DateFormat('HH:mm').format((createdOn ?? DateTime.now()).toLocal()),
               style: TextStyle(
-                color: isUser ? Colors.white70 : Colors.black45,
+                color: isUser ? Colors.white70 : AppColors.textSecondary,
                 fontSize: 11,
               ),
             ),

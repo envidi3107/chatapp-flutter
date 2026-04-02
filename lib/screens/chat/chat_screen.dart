@@ -1253,16 +1253,6 @@ child: Column(
         actions: [
           if (isGroupRoom)
             IconButton(
-              icon: Image.asset('lib/assets/ai_summary_icon.png', width: 24, height: 24),
-              tooltip: 'Tóm tắt tin nhắn',
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Tính năng tóm tắt đang được phát triển')),
-                );
-              },
-            ),
-          if (isGroupRoom)
-            IconButton(
               icon: const Icon(Icons.group_outlined),
               tooltip: 'Thành viên nhóm',
               onPressed: () async {
