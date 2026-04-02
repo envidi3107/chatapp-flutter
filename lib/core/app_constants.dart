@@ -7,8 +7,11 @@ class AppConstants {
   );
 
   static String get baseUrl {
-    if (_baseUrlFromEnv.isNotEmpty) {
-      return _baseUrlFromEnv;
+    final baseUrl = _baseUrlFromEnv.trim();
+    if (baseUrl.isNotEmpty) {
+      return baseUrl.endsWith('/')
+          ? baseUrl.substring(0, baseUrl.length - 1)
+          : baseUrl;
     }
 
     // Web and desktop/simulator targets should call localhost directly.

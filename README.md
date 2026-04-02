@@ -1,16 +1,33 @@
 # messenger_app
 
-A new Flutter project.
+Flutter chat app currently configured to support only `android` and `web`.
 
-## Getting Started
+## Environment config
 
-This project is a starting point for a Flutter application.
+This project reads environment values via Flutter `--dart-define-from-file`.
 
-A few resources to get you started if this is your first Flutter project:
+1. Copy `/.env.example.json` to `/.env.json`.
+2. Update the values in `/.env.json`.
+3. Run Flutter with `--dart-define-from-file=.env.json`.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Example file:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```json
+{
+  "API_BASE_URL": "http://10.0.2.2:8080"
+}
+```
+
+Example commands:
+
+```bash
+flutter run -d android --dart-define-from-file=.env.json
+flutter run -d chrome --dart-define-from-file=.env.json
+flutter analyze
+```
+
+Notes:
+
+- Android emulator usually needs `http://10.0.2.2:8080` to reach a backend on your machine.
+- Web usually needs a browser-reachable host such as `http://localhost:8080`.
+- If `API_BASE_URL` is missing, the app now fails fast instead of silently using a hard-coded endpoint.
