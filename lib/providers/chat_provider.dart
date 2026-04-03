@@ -125,7 +125,7 @@ class ChatProvider extends ChangeNotifier {
 
   Future<String?> transcribeSpeech({
     required String filePath,
-    String language = 'vi',
+    String language = 'auto',
     String? prompt,
   }) async {
     final normalizedPath = filePath.trim();

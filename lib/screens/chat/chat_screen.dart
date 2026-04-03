@@ -736,7 +736,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
 
   String _voiceInputHint() {
     if (_isVoiceInputSupported) {
-      return 'Nhấn và giữ nút micro để ghi âm';
+      return 'Nhấn và giữ nút micro để ghi âm (hỗ trợ Việt/Anh/Nhật)';
     }
 
     return 'Thiết bị hiện tại chưa hỗ trợ ghi âm. Hãy dùng Android, iOS hoặc Windows.';
@@ -986,8 +986,7 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     final chatProvider = context.read<ChatProvider>();
     final transcribed = await chatProvider.transcribeSpeech(
       filePath: recordedPath,
-      language: 'vi',
-      prompt: 'Đây là hội thoại tiếng Việt trong ứng dụng chat.',
+      language: 'auto',
     );
 
     if (!mounted) {

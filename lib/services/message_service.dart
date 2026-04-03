@@ -145,10 +145,10 @@ class MessageService {
 
   Future<String> transcribeSpeech({
     required XFile audioFile,
-    String language = 'vi',
+    String language = 'auto',
     String? prompt,
   }) async {
-    final normalizedLanguage = language.trim().isEmpty ? 'vi' : language.trim();
+    final normalizedLanguage = _normalizeSpeechLanguage(language);
     final normalizedPrompt = (prompt ?? '').trim();
 
     Future<List<http.MultipartFile>> buildFiles() async {
@@ -191,6 +191,31 @@ class MessageService {
     }
 
     return text;
+  }
+
+  String _normalizeSpeechLanguage(String language) {
+    final value = language.trim().toLowerCase().replaceAll('_', '-');
+    switch (value) {
+      case '':
+      case 'auto':
+        return 'auto';
+      case 'vi':
+      case 'vi-vn':
+      case 'vietnamese':
+        return 'vi';
+      case 'en':
+      case 'en-us':
+      case 'en-gb':
+      case 'english':
+        return 'en';
+      case 'ja':
+      case 'ja-jp':
+      case 'jp':
+      case 'japanese':
+        return 'ja';
+      default:
+        return 'auto';
+    }
   }
 
   Future<MessageTranslationModel> translateMessageToVietnamese({
