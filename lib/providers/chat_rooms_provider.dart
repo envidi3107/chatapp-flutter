@@ -467,22 +467,63 @@ class ChatRoomsProvider extends ChangeNotifier {
       return;
     }
 
+    final room = _rooms[index];
+    final currentLatest = room.latestMessage;
+    final isLatestUpdate = _isSameMessage(currentLatest, message);
+    final isNewMessage = _isNewerMessage(currentLatest, message);
+
+    if (!isNewMessage && !isLatestUpdate) {
+      return;
+    }
+
     final isOwnMessage =
         _currentUsername != null && message.sender == _currentUsername;
     final isActiveRoom = _activeRoomId == roomId;
 
-    if (!isOwnMessage && !isActiveRoom) {
+    if (isNewMessage && !isOwnMessage && !isActiveRoom) {
       _unreadCounts[roomId] = (_unreadCounts[roomId] ?? 0) + 1;
-    } else {
+    } else if (isNewMessage) {
       final lastSeenAt = message.sentOn ?? DateTime.now();
       unawaited(_unreadStateService.setLastReadAt(roomId, lastSeenAt));
     }
 
-    final updatedRoom = _rooms[index].copyWith(latestMessage: message);
+    final updatedRoom = room.copyWith(latestMessage: message);
     final nextRooms = [..._rooms];
     nextRooms[index] = updatedRoom;
     _rooms = _sortRooms(nextRooms);
     notifyListeners();
+  }
+
+  bool _isSameMessage(
+      MessageReceiveModel? current, MessageReceiveModel incoming) {
+    final currentId = current?.id;
+    final incomingId = incoming.id;
+    return currentId != null && incomingId != null && currentId == incomingId;
+  }
+
+  bool _isNewerMessage(
+      MessageReceiveModel? current, MessageReceiveModel incoming) {
+    if (current == null) {
+      return true;
+    }
+
+    if (_isSameMessage(current, incoming)) {
+      return false;
+    }
+
+    final currentTimestamp = current.sentOn?.millisecondsSinceEpoch ?? 0;
+    final incomingTimestamp = incoming.sentOn?.millisecondsSinceEpoch ?? 0;
+    if (incomingTimestamp != currentTimestamp) {
+      return incomingTimestamp > currentTimestamp;
+    }
+
+    final currentId = current.id;
+    final incomingId = incoming.id;
+    if (currentId != null && incomingId != null) {
+      return incomingId > currentId;
+    }
+
+    return false;
   }
 
   List<ChatRoomModel> _sortRooms(List<ChatRoomModel> input) {

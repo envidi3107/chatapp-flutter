@@ -15,7 +15,8 @@ class ChatbotScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => ChatbotProvider(context.read<ChatbotService>())..bootstrap(),
+      create: (_) =>
+          ChatbotProvider(context.read<ChatbotService>())..bootstrap(),
       child: const _ChatbotView(),
     );
   }
@@ -292,7 +293,8 @@ class _ChatbotViewState extends State<_ChatbotView> {
                             onChanged: provider.setMcpSessionId,
                             decoration: const InputDecoration(
                               isDense: true,
-                              labelText: 'MCP session id (cho tích hợp sau này)',
+                              labelText:
+                                  'MCP session id (cho tích hợp sau này)',
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -364,8 +366,8 @@ class _ChatbotViewState extends State<_ChatbotView> {
                                   : Icons.extension_off_outlined,
                             ),
                             color: provider.useMcp
-                              ? AppColors.primary
-                              : AppColors.textHint,
+                                ? AppColors.primary
+                                : AppColors.textHint,
                           ),
                           Expanded(
                             child: TextField(
@@ -453,7 +455,8 @@ class _ConversationSelector extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.history, size: 18, color: AppColors.textSecondary),
+              const Icon(Icons.history,
+                  size: 18, color: AppColors.textSecondary),
               const SizedBox(width: 6),
               const Expanded(
                 child: Text(
@@ -466,7 +469,8 @@ class _ConversationSelector extends StatelessWidget {
                 ),
               ),
               IconButton(
-                onPressed: isCreating || isDeleting ? null : onCreateConversation,
+                onPressed:
+                    isCreating || isDeleting ? null : onCreateConversation,
                 tooltip: 'Tạo cuộc trò chuyện chatbot mới',
                 icon: isCreating
                     ? const SizedBox(
@@ -526,8 +530,9 @@ class _ConversationSelector extends StatelessWidget {
           final isActive = activeConversationId == item.id;
 
           return Material(
-            color:
-                isActive ? AppColors.primary.withOpacity(0.16) : AppColors.bgInput,
+            color: isActive
+                ? AppColors.primary.withValues(alpha: 0.16)
+                : AppColors.bgInput,
             borderRadius: BorderRadius.circular(10),
             child: InkWell(
               borderRadius: BorderRadius.circular(10),
@@ -549,9 +554,8 @@ class _ConversationSelector extends StatelessWidget {
                             style: TextStyle(
                               color: AppColors.textPrimary,
                               fontSize: 13,
-                              fontWeight: isActive
-                                  ? FontWeight.w700
-                                  : FontWeight.w600,
+                              fontWeight:
+                                  isActive ? FontWeight.w700 : FontWeight.w600,
                             ),
                           ),
                         ),
@@ -593,7 +597,8 @@ class _ConversationSelector extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _formatConversationTimestamp(item.updatedOn ?? item.createdOn),
+                      _formatConversationTimestamp(
+                          item.updatedOn ?? item.createdOn),
                       style: const TextStyle(
                         color: AppColors.textHint,
                         fontSize: 11,
@@ -715,7 +720,8 @@ class _ChatbotBubble extends StatelessWidget {
               MarkdownBody(
                 data: content,
                 selectable: true,
-                styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                styleSheet:
+                    MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
                   p: TextStyle(
                     color: textColor,
                     fontSize: 15,
@@ -727,7 +733,8 @@ class _ChatbotBubble extends StatelessWidget {
             Text(
               isStreaming
                   ? 'Đang trả lời...'
-                  : DateFormat('HH:mm').format((createdOn ?? DateTime.now()).toLocal()),
+                  : DateFormat('HH:mm')
+                      .format((createdOn ?? DateTime.now()).toLocal()),
               style: TextStyle(
                 color: isUser ? Colors.white70 : AppColors.textSecondary,
                 fontSize: 11,

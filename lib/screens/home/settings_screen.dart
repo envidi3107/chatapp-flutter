@@ -26,7 +26,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.bgCard,
-        title: const Text('Đăng xuất', style: TextStyle(color: AppColors.textPrimary)),
+        title: const Text('Đăng xuất',
+            style: TextStyle(color: AppColors.textPrimary)),
         content: const Text(
           'Bạn có chắc chắn muốn đăng xuất không?',
           style: TextStyle(color: AppColors.textSecondary),
@@ -90,7 +91,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         elevation: 0,
         title: const Text(
           'Cài đặt & Tuỳ chỉnh',
-          style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700),
+          style: TextStyle(
+              color: AppColors.textPrimary, fontWeight: FontWeight.w700),
         ),
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
       ),
@@ -142,10 +144,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ? Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(lang.flagEmoji, style: const TextStyle(fontSize: 18)),
+                        Text(lang.flagEmoji,
+                            style: const TextStyle(fontSize: 18)),
                         const SizedBox(width: 6),
                         Text(lang.name,
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                            style: const TextStyle(
+                                color: AppColors.textSecondary, fontSize: 13)),
                         const SizedBox(width: 4),
                         const Icon(Icons.chevron_right_rounded,
                             color: AppColors.textSecondary, size: 18),
@@ -293,7 +297,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 2),
                 Text(
                   '@${auth.username ?? ''}',
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, fontSize: 13),
                 ),
               ],
             ),
@@ -353,9 +358,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         child: Icon(icon, color: AppColors.textSecondary, size: 18),
       ),
-      title: Text(title, style: const TextStyle(color: AppColors.textPrimary, fontSize: 15)),
+      title: Text(title,
+          style: const TextStyle(color: AppColors.textPrimary, fontSize: 15)),
       subtitle: subtitle != null
-          ? Text(subtitle, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12))
+          ? Text(subtitle,
+              style:
+                  const TextStyle(color: AppColors.textSecondary, fontSize: 12))
           : null,
       trailing: trailing ??
           (trailingLabel != null
@@ -365,7 +373,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ))
-              : const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary)),
+              : const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.textSecondary)),
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
     );
@@ -384,19 +393,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          color: (iconColor ?? AppColors.textSecondary).withOpacity(0.15),
+          color: (iconColor ?? AppColors.textSecondary).withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(icon, color: iconColor ?? AppColors.textSecondary, size: 18),
+        child:
+            Icon(icon, color: iconColor ?? AppColors.textSecondary, size: 18),
       ),
-      title: Text(title, style: const TextStyle(color: AppColors.textPrimary, fontSize: 15)),
+      title: Text(title,
+          style: const TextStyle(color: AppColors.textPrimary, fontSize: 15)),
       subtitle: subtitle != null
-          ? Text(subtitle, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12))
+          ? Text(subtitle,
+              style:
+                  const TextStyle(color: AppColors.textSecondary, fontSize: 12))
           : null,
       trailing: Switch.adaptive(
         value: value,
         onChanged: onChanged,
-        activeColor: AppColors.primary,
+        activeThumbColor: AppColors.primary,
       ),
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
@@ -477,7 +490,8 @@ class _LanguagePickerSheetState extends State<_LanguagePickerSheet> {
                 decoration: InputDecoration(
                   hintText: 'Tìm kiếm ngôn ngữ...',
                   hintStyle: const TextStyle(color: AppColors.textSecondary),
-                  prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                  prefixIcon:
+                      const Icon(Icons.search, color: AppColors.textSecondary),
                   filled: true,
                   fillColor: AppColors.bgInput,
                   border: OutlineInputBorder(
@@ -511,7 +525,8 @@ class _LanguagePickerSheetState extends State<_LanguagePickerSheet> {
                                   fontWeight: FontWeight.w500)),
                           subtitle: Text(lang.nativeName,
                               style: const TextStyle(
-                                  color: AppColors.textSecondary, fontSize: 13)),
+                                  color: AppColors.textSecondary,
+                                  fontSize: 13)),
                           trailing: isSelected
                               ? const Icon(Icons.check_circle_rounded,
                                   color: AppColors.primary)

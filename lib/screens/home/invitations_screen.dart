@@ -89,8 +89,9 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                         horizontal: 12,
                         vertical: 6,
                       ),
-                      color:
-                          notification.isRead ? null : AppColors.primary.withOpacity(0.16),
+                      color: notification.isRead
+                          ? null
+                          : AppColors.primary.withValues(alpha: 0.16),
                       child: ListTile(
                         leading: const CircleAvatar(
                           child: Icon(Icons.group_add_rounded),
@@ -182,7 +183,8 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                               const SizedBox(width: 4),
                               IconButton.filledTonal(
                                 style: IconButton.styleFrom(
-                                  backgroundColor: Colors.redAccent.withOpacity(0.18),
+                                  backgroundColor:
+                                      Colors.redAccent.withValues(alpha: 0.18),
                                 ),
                                 onPressed: () async {
                                   await _replyAndRefresh(

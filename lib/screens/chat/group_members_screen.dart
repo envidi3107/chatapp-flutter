@@ -513,8 +513,10 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: AppColors.bgCard,
-          title: Text('Xoá thành viên', style: const TextStyle(color: AppColors.textPrimary)),
-          content: Text('Bạn có chắc xoá ${member.displayLabel} khỏi nhóm?', style: const TextStyle(color: AppColors.textPrimary)),
+          title: const Text('Xoá thành viên',
+              style: TextStyle(color: AppColors.textPrimary)),
+          content: Text('Bạn có chắc xoá ${member.displayLabel} khỏi nhóm?',
+              style: const TextStyle(color: AppColors.textPrimary)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -587,8 +589,10 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: AppColors.bgCard,
-          title: Text('Rời nhóm', style: const TextStyle(color: AppColors.textPrimary)),
-          content: Text('Bạn có chắc chắn muốn rời nhóm?', style: const TextStyle(color: AppColors.textPrimary)),
+          title: const Text('Rời nhóm',
+              style: TextStyle(color: AppColors.textPrimary)),
+          content: const Text('Bạn có chắc chắn muốn rời nhóm?',
+              style: TextStyle(color: AppColors.textPrimary)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -654,10 +658,11 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: AppColors.bgCard,
-          title: Text('Giải tán nhóm', style: const TextStyle(color: AppColors.textPrimary)),
-          content: Text(
+          title: const Text('Giải tán nhóm',
+              style: TextStyle(color: AppColors.textPrimary)),
+          content: const Text(
             'Hành động này sẽ xoá nhóm vĩnh viễn và toàn bộ tin nhắn. Tiếp tục?',
-            style: const TextStyle(color: AppColors.textPrimary),
+            style: TextStyle(color: AppColors.textPrimary),
           ),
           actions: [
             TextButton(
@@ -742,7 +747,8 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_error ?? 'Không thể tải thành viên.', style: const TextStyle(color: AppColors.textPrimary)),
+                Text(_error ?? 'Không thể tải thành viên.',
+                    style: const TextStyle(color: AppColors.textPrimary)),
                 const SizedBox(height: 10),
                 FilledButton(
                   onPressed: _isLoading ? null : () => _loadGroup(),
@@ -773,7 +779,8 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       appBar: AppBar(
-        title: Text('Thành viên (${group.members.length})', style: const TextStyle(color: AppColors.textPrimary)),
+        title: Text('Thành viên (${group.members.length})',
+            style: const TextStyle(color: AppColors.textPrimary)),
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
         actions: [
           IconButton(

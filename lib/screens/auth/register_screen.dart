@@ -57,7 +57,8 @@ class _RegisterScreenState extends State<RegisterScreen>
     if (!mounted) return;
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đăng ký thành công! Vui lòng đăng nhập.')),
+        const SnackBar(
+            content: Text('Đăng ký thành công! Vui lòng đăng nhập.')),
       );
       Navigator.of(context).pop();
       return;
@@ -219,9 +220,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                       ),
                       decoration: InputDecoration(
                         hintText: 'Nhập lại mật khẩu',
-                        prefixIcon: const Icon(
-                            Icons.lock_clock_outlined,
-                            size: 20),
+                        prefixIcon:
+                            const Icon(Icons.lock_clock_outlined, size: 20),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscureConfirm
@@ -366,7 +366,7 @@ class _RegisterIconWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6366F1).withOpacity(0.4),
+            color: const Color(0xFF6366F1).withValues(alpha: 0.4),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),

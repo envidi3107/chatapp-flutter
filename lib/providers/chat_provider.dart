@@ -85,9 +85,16 @@ class ChatProvider extends ChangeNotifier {
   Future<void> startRealtime() async {
     await _realtimeService.connect();
     _messageSub ??= _realtimeService.roomMessageStream(_roomId).listen((item) {
+      final previous = _messageById(item.id);
+      final isNewMessage = previous == null;
+
       _messages = _sortBySentOn([..._messages, item]);
+      _clearStaleTranslationForIncomingMessage(
+        previous: previous,
+        current: item,
+      );
       _pruneTranslationState();
-      if (item.sender != _currentUsername) {
+      if (isNewMessage && item.sender != _currentUsername) {
         unawaited(_emitReadStatus());
       }
       notifyListeners();
@@ -165,13 +172,13 @@ class ChatProvider extends ChangeNotifier {
   Future<bool> recallMessage({
     required int messageId,
   }) async {
+    _error = null;
+
     try {
       await _messageService.recallMessage(messageId);
-      _translatedByMessageId.remove(messageId);
-      _translatingMessageIds.remove(messageId);
-      if (_persistedTranslations.remove(messageId) != null) {
-        await _savePersistedTranslations();
-      }
+      _markMessageRecalled(messageId);
+      _clearTranslationForMessage(messageId);
+      notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -393,6 +400,60 @@ class ChatProvider extends ChangeNotifier {
         _messages.map((item) => item.id).whereType<int>().toSet();
     _translatedByMessageId.removeWhere((id, _) => !existingIds.contains(id));
     _translatingMessageIds.removeWhere((id) => !existingIds.contains(id));
+  }
+
+  MessageReceiveModel? _messageById(int? messageId) {
+    if (messageId == null) {
+      return null;
+    }
+
+    for (final message in _messages) {
+      if (message.id == messageId) {
+        return message;
+      }
+    }
+
+    return null;
+  }
+
+  void _markMessageRecalled(int messageId) {
+    final index = _messages.indexWhere((item) => item.id == messageId);
+    if (index < 0) {
+      return;
+    }
+
+    final nextMessages = [..._messages];
+    nextMessages[index] = nextMessages[index].copyWith(
+      message: '',
+      attachments: const [],
+    );
+    _messages = _sortBySentOn(nextMessages);
+  }
+
+  void _clearStaleTranslationForIncomingMessage({
+    required MessageReceiveModel? previous,
+    required MessageReceiveModel current,
+  }) {
+    final messageId = current.id;
+    if (messageId == null) {
+      return;
+    }
+
+    final previousText = (previous?.message ?? '').trim();
+    final currentText = (current.message ?? '').trim();
+    if (previousText == currentText) {
+      return;
+    }
+
+    _clearTranslationForMessage(messageId);
+  }
+
+  void _clearTranslationForMessage(int messageId) {
+    _translatedByMessageId.remove(messageId);
+    _translatingMessageIds.remove(messageId);
+    if (_persistedTranslations.remove(messageId) != null) {
+      unawaited(_savePersistedTranslations());
+    }
   }
 
   List<MessageReceiveModel> _sortBySentOn(List<MessageReceiveModel> items) {

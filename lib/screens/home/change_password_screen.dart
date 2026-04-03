@@ -56,7 +56,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         Navigator.of(context).pop();
       } else {
         final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final detail = body['detail'] ?? body['title'] ?? 'Đổi mật khẩu thất bại';
+        final detail =
+            body['detail'] ?? body['title'] ?? 'Đổi mật khẩu thất bại';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(detail.toString())),
         );
@@ -91,13 +92,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+              border:
+                  Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
             ),
             child: const Row(
               children: [
-                Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 18),
+                Icon(Icons.info_outline_rounded,
+                    color: AppColors.primary, size: 18),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -118,8 +121,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   label: 'Mật khẩu hiện tại',
                   show: _showCurrent,
                   onToggle: () => setState(() => _showCurrent = !_showCurrent),
-                  validator: (v) =>
-                      (v ?? '').isEmpty ? 'Vui lòng nhập mật khẩu hiện tại' : null,
+                  validator: (v) => (v ?? '').isEmpty
+                      ? 'Vui lòng nhập mật khẩu hiện tại'
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 _buildPasswordField(
@@ -128,8 +132,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   show: _showNew,
                   onToggle: () => setState(() => _showNew = !_showNew),
                   validator: (v) {
-                    if ((v ?? '').isEmpty) return 'Vui lòng nhập mật khẩu mới';
-                    if (v!.length < 6) return 'Mật khẩu phải có ít nhất 6 ký tự';
+                    if ((v ?? '').isEmpty) {
+                      return 'Vui lòng nhập mật khẩu mới';
+                    }
+                    if (v!.length < 6) {
+                      return 'Mật khẩu phải có ít nhất 6 ký tự';
+                    }
                     return null;
                   },
                 ),
@@ -140,8 +148,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   show: _showConfirm,
                   onToggle: () => setState(() => _showConfirm = !_showConfirm),
                   validator: (v) {
-                    if ((v ?? '').isEmpty) return 'Vui lòng xác nhận mật khẩu mới';
-                    if (v != _newPasswordCtrl.text) return 'Mật khẩu xác nhận không khớp';
+                    if ((v ?? '').isEmpty) {
+                      return 'Vui lòng xác nhận mật khẩu mới';
+                    }
+                    if (v != _newPasswordCtrl.text) {
+                      return 'Mật khẩu xác nhận không khớp';
+                    }
                     return null;
                   },
                 ),
@@ -155,13 +167,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 ? const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
                   )
                 : const Icon(Icons.lock_reset_rounded),
             label: const Text('Đổi mật khẩu'),
             style: FilledButton.styleFrom(
               minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ],
