@@ -804,6 +804,25 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     return DateFormat('dd/MM/yyyy HH:mm').format(seenAt);
   }
 
+  bool _isSameCalendarDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  String _formatTimelineDayLabel(DateTime day) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (_isSameCalendarDay(day, today)) {
+      return 'Hôm nay';
+    }
+
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (_isSameCalendarDay(day, yesterday)) {
+      return 'Hôm qua';
+    }
+
+    return DateFormat('dd/MM/yyyy').format(day);
+  }
+
   Future<void> _pickImage() async {
     if (_isMessagingBlocked || _isVoiceRecording) {
       return;
@@ -1430,7 +1449,25 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     });
 
     final timelineItems = <_ChatTimelineItem>[];
+    DateTime? previousTimelineDay;
     for (var i = 0; i < messages.length; i++) {
+      final localSentOn = messages[i].sentOn?.toLocal();
+      if (localSentOn != null) {
+        final timelineDay = DateTime(
+          localSentOn.year,
+          localSentOn.month,
+          localSentOn.day,
+        );
+        final previousDay = previousTimelineDay;
+        if (previousDay == null ||
+            !_isSameCalendarDay(previousDay, timelineDay)) {
+          timelineItems.add(
+            _ChatTimelineItem.dateMarker(day: timelineDay),
+          );
+          previousTimelineDay = timelineDay;
+        }
+      }
+
       timelineItems.add(
         _ChatTimelineItem.message(
           index: i,
@@ -1552,6 +1589,12 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
                     itemCount: timelineItems.length,
                     itemBuilder: (context, index) {
                       final timeline = timelineItems[index];
+                      if (timeline.dateMarker != null) {
+                        return _ChatDateSeparator(
+                          label: _formatTimelineDayLabel(timeline.dateMarker!),
+                        );
+                      }
+
                       final messageIndex = timeline.messageIndex!;
                       final item = messages[messageIndex];
                       final systemNotice = _groupSystemNoticeFromMessage(item);
@@ -1899,7 +1942,8 @@ class _GroupSystemNotice {
 
 class _ChatTimelineItem {
   const _ChatTimelineItem._({
-    required this.messageIndex,
+    this.messageIndex,
+    this.dateMarker,
   });
 
   factory _ChatTimelineItem.message({
@@ -1910,7 +1954,47 @@ class _ChatTimelineItem {
     );
   }
 
+  factory _ChatTimelineItem.dateMarker({
+    required DateTime day,
+  }) {
+    return _ChatTimelineItem._(
+      dateMarker: day,
+    );
+  }
+
   final int? messageIndex;
+  final DateTime? dateMarker;
+}
+
+class _ChatDateSeparator extends StatelessWidget {
+  const _ChatDateSeparator({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: AppColors.bgSurface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _GroupSystemNoticeTile extends StatelessWidget {

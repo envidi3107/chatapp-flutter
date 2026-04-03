@@ -147,17 +147,22 @@ class ChatRoomTile extends StatelessWidget {
 
   String _formatDate(DateTime? dt) {
     if (dt == null) return '';
+    final localDateTime = dt.toLocal();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final msgDay = DateTime(dt.year, dt.month, dt.day);
+    final msgDay = DateTime(
+      localDateTime.year,
+      localDateTime.month,
+      localDateTime.day,
+    );
     final diff = today.difference(msgDay).inDays;
 
-    if (diff == 0) return DateFormat('HH:mm').format(dt);
+    if (diff == 0) return DateFormat('HH:mm').format(localDateTime);
     if (diff == 1) return 'Hôm qua';
     if (diff < 7) {
       const days = ['CN', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-      return days[dt.weekday % 7];
+      return days[localDateTime.weekday % 7];
     }
-    return DateFormat('dd/MM').format(dt);
+    return DateFormat('dd/MM').format(localDateTime);
   }
 }

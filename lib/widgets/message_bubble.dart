@@ -87,7 +87,7 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sentOn = message.sentOn;
+    final sentOn = message.sentOn?.toLocal();
     final imageUrls = message.attachments
         .where(_isImageAttachment)
         .map((item) => item.source)
