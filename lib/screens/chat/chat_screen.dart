@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -172,7 +172,8 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _scheduleReadSync();
-      unawaited(context.read<ChatProvider>().refreshTranslationTargetLanguage());
+      unawaited(
+          context.read<ChatProvider>().refreshTranslationTargetLanguage());
     }
   }
 
@@ -1245,9 +1246,10 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     final isTranslating = chat.isTranslatingMessage(messageId);
     final targetLanguage =
         LanguageOption.findByCode(chat.translationTargetLanguageCode);
-    final targetLanguageLabel =
-        (targetLanguage?.nativeName ?? targetLanguage?.name ?? 'ngon ngu da chon')
-            .trim();
+    final targetLanguageLabel = (targetLanguage?.nativeName ??
+            targetLanguage?.name ??
+            'ngon ngu da chon')
+        .trim();
 
     showModalBottomSheet<void>(
       context: context,
@@ -1312,11 +1314,10 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
     final isOnline = _isPeerOnline == true;
     final messages = chat.messages;
     final translationLanguage =
-      LanguageOption.findByCode(chat.translationTargetLanguageCode);
-    final translationLanguageLabel =
-      (translationLanguage?.nativeName ??
-          translationLanguage?.name ??
-          chat.translationTargetLanguageCode.toUpperCase())
+        LanguageOption.findByCode(chat.translationTargetLanguageCode);
+    final translationLanguageLabel = (translationLanguage?.nativeName ??
+            translationLanguage?.name ??
+            chat.translationTargetLanguageCode.toUpperCase())
         .trim();
     final isGroupRoom =
         widget.peerUsername == null || widget.peerUsername!.isEmpty;

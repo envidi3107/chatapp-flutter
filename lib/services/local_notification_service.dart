@@ -56,7 +56,9 @@ class LocalNotificationService {
       ),
     );
 
-    await _plugin.initialize(initializationSettings);
+    await _plugin.initialize(
+      settings: initializationSettings,
+    );
 
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
@@ -181,10 +183,10 @@ class LocalNotificationService {
     );
 
     await _plugin.show(
-      notificationId,
-      title,
-      body,
-      details,
+      id: notificationId,
+      title: title,
+      body: body,
+      notificationDetails: details,
       payload: payload,
     );
   }

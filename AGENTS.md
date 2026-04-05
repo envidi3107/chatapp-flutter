@@ -28,6 +28,11 @@ This guide helps coding agents and contributors work safely in the Chat App Flut
 - If config keys change, update `.env.example.json` and `README.md` in the same change.
 - Never commit real API keys or private credentials.
 
+### Build Before Commit Rule
+
+- **ALWAYS build before commit**: run `flutter analyze` and ensure no errors.
+- **Check for Android SDK**: run `flutter doctor --android-licenses --dry-run` or check if `ANDROID_HOME` is set. If Android SDK is available, also run `flutter build apk --debug` and ensure it passes before committing.
+
 ## Project Structure Guide
 
 ### Repo Layout
