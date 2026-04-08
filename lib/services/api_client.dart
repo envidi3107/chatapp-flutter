@@ -73,7 +73,10 @@ class ApiClient {
 
     var response = await execute();
 
-    if (authRequired && response.statusCode == 401 && await _refreshToken()) {
+    if (authRequired &&
+        response.statusCode == 401 &&
+        _isBearerTokenError(response) &&
+        await _refreshToken()) {
       response = await execute();
     }
 
@@ -128,7 +131,10 @@ class ApiClient {
     request.files.addAll(await buildFiles());
     var streamed = await request.send();
 
-    if (authRequired && streamed.statusCode == 401 && await _refreshToken()) {
+    if (authRequired &&
+        streamed.statusCode == 401 &&
+        _isBearerTokenError(streamed) &&
+        await _refreshToken()) {
       final retry = http.MultipartRequest('POST', _uri(path, query));
       retry.headers.addAll(
         await _buildHeaders(
@@ -162,7 +168,10 @@ class ApiClient {
     request.files.addAll(await buildFiles());
     var streamed = await request.send();
 
-    if (authRequired && streamed.statusCode == 401 && await _refreshToken()) {
+    if (authRequired &&
+        streamed.statusCode == 401 &&
+        _isBearerTokenError(streamed) &&
+        await _refreshToken()) {
       final retry = http.MultipartRequest('PUT', _uri(path, query));
       retry.headers.addAll(
         await _buildHeaders(
@@ -178,13 +187,21 @@ class ApiClient {
     return streamed;
   }
 
+  bool _isBearerTokenError(http.BaseResponse response) {
+    final authHeader = response.headers['www-authenticate'] ?? '';
+    return authHeader.toLowerCase().startsWith('bearer ');
+  }
+
   Future<http.Response> _sendWithRefresh(
     Future<http.Response> Function() execute, {
     required bool authRequired,
   }) async {
     var response = await execute();
 
-    if (authRequired && response.statusCode == 401 && await _refreshToken()) {
+    if (authRequired &&
+        response.statusCode == 401 &&
+        _isBearerTokenError(response) &&
+        await _refreshToken()) {
       response = await execute();
     }
 
@@ -238,10 +255,12 @@ class ApiClient {
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     final access = (body['access'] ?? '').toString();
     if (access.isEmpty) {
+      await _tokenStorage.clear();
       return false;
     }
 
-    final currentRefresh = await _tokenStorage.getRefreshToken() ?? refreshToken;
+    final currentRefresh =
+        await _tokenStorage.getRefreshToken() ?? refreshToken;
     await _tokenStorage.saveTokens(
       TokenPairModel(access: access, refresh: currentRefresh),
     );
