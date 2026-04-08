@@ -6,6 +6,9 @@ import 'package:provider/provider.dart';
 import '../../core/app_theme.dart';
 import '../../models/language_option.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/notification_settings_service.dart';
+import '../../services/firebase_messaging_service.dart';
+import '../../services/api_client.dart';
 import '../../services/translation_preferences_service.dart';
 import '../../widgets/app_avatar.dart';
 import '../auth/login_screen.dart';
@@ -23,7 +26,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _autoTranslate = false;
   bool _smartSummary = false;
   bool _readReceipts = true;
+  bool _pushNotifications = true;
+  bool _isPushSettingsLoading = true;
+  bool _didLoadPushSettings = false;
   final _translationPreferencesService = TranslationPreferencesService();
+  NotificationSettingsService? _notificationSettingsService;
   String _translationTargetLanguageCode =
       TranslationPreferencesService.defaultTargetLanguage;
   bool _isTranslationLanguageLoading = true;
@@ -32,6 +39,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     unawaited(_loadTranslationTargetLanguage());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _notificationSettingsService ??
+        NotificationSettingsService(context.read<ApiClient>());
+    if (!_didLoadPushSettings) {
+      _didLoadPushSettings = true;
+      unawaited(_loadPushNotificationSettings());
+    }
   }
 
   Future<void> _loadTranslationTargetLanguage() async {
@@ -44,6 +62,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _translationTargetLanguageCode = code;
       _isTranslationLanguageLoading = false;
     });
+  }
+
+  Future<void> _loadPushNotificationSettings() async {
+    try {
+      final service = _notificationSettingsService;
+      if (service == null) {
+        return;
+      }
+
+      final enabled = await service.getPushEnabled();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _pushNotifications = enabled;
+        _isPushSettingsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isPushSettingsLoading = false;
+      });
+    }
+  }
+
+  Future<void> _togglePushNotifications(bool enabled) async {
+    final service = _notificationSettingsService;
+    final messagingService = context.read<FirebaseMessagingService>();
+    if (service == null) {
+      return;
+    }
+
+    final previous = _pushNotifications;
+    setState(() {
+      _pushNotifications = enabled;
+    });
+
+    try {
+      final saved = await service.updatePushEnabled(enabled);
+      await messagingService.syncPushPreference(saved);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _pushNotifications = saved;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _pushNotifications = previous;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể cập nhật cài đặt thông báo')),
+      );
+    }
   }
 
   Future<void> _confirmLogout() async {
@@ -303,14 +384,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // ── THÔNG BÁO ──
           _buildSectionLabel('THÔNG BÁO'),
           _buildCard([
-            _buildNavTile(
+            _buildToggleTile(
               icon: Icons.notifications_outlined,
+              iconColor: AppColors.primary,
               title: 'Thông báo đẩy',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Tính năng đang phát triển')),
-                );
-              },
+              subtitle: _isPushSettingsLoading ? 'Đang tải...' : null,
+              value: _pushNotifications,
+              onChanged:
+                  _isPushSettingsLoading ? (_) {} : _togglePushNotifications,
             ),
             _buildDivider(),
             _buildNavTile(

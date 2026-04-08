@@ -99,6 +99,22 @@ class ApiClient {
     );
   }
 
+  Future<http.Response> putJson(
+    String path,
+    Map<String, dynamic> body, {
+    Map<String, dynamic>? query,
+    bool authRequired = true,
+  }) async {
+    return _sendWithRefresh(
+      () async => _httpClient.put(
+        _uri(path, query),
+        headers: await _buildHeaders(authRequired: authRequired),
+        body: jsonEncode(body),
+      ),
+      authRequired: authRequired,
+    );
+  }
+
   Future<http.Response> delete(
     String path, {
     Map<String, dynamic>? query,

@@ -25,5 +25,9 @@ class FirebaseMessagingService {
     print('FCM: initialize() called but no native implementation available');
   }
 
+  Future<void> syncPushPreference(bool enabled) async {
+    if (kIsWeb) return;
+  }
+
   void dispose() => _tapController.close();
 }

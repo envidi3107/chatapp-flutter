@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
 
 import 'api_client.dart';
 import '../models/fcm_notification_payload.dart';
 import 'local_notification_service.dart';
 import 'fcm_token_manager_service.dart';
+import 'notification_settings_service.dart';
 
 class FirebaseMessagingService {
   FirebaseMessagingService({
@@ -16,7 +16,9 @@ class FirebaseMessagingService {
 
   final LocalNotificationService localNotificationService;
   final ApiClient apiClient;
+  late final NotificationSettingsService _notificationSettingsService;
   late final FcmTokenManagerService _tokenManager;
+  bool _pushEnabled = true;
 
   final StreamController<FcmNotificationPayload> _tapController =
       StreamController<FcmNotificationPayload>.broadcast();
@@ -24,6 +26,8 @@ class FirebaseMessagingService {
   Stream<FcmNotificationPayload> get tapStream => _tapController.stream;
 
   Future<void> initialize() async {
+    _notificationSettingsService = NotificationSettingsService(apiClient);
+
     // Initialize the token manager
     _tokenManager = FcmTokenManagerService(apiClient: apiClient);
 
@@ -46,24 +50,21 @@ class FirebaseMessagingService {
     }
 
     try {
-      print('[FCM] Getting token...');
-      final token = await FirebaseMessaging.instance.getToken();
-      print('[FCM] Token = $token');
-      if (token != null && token.isNotEmpty) {
-        // Use resilient token manager instead of direct registration
-        await _tokenManager.registerTokenWithRetry(token);
+      _pushEnabled = await _notificationSettingsService.getPushEnabled();
+      if (_pushEnabled) {
+        await _registerCurrentToken();
       } else {
-        print('[FCM] getToken() returned null or empty');
+        print('[FCM] Push notifications disabled by user settings');
       }
     } catch (e) {
-      print('[FCM] Failed to get token: $e');
-      // Non-fatal: app continues even if token retrieval fails
+      print('[FCM] Failed to load push settings or register token: $e');
     }
 
-    // Listen for token refresh and register with retry logic
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
       print('[FCM] Token refreshed: $newToken');
-      _tokenManager.registerTokenWithRetry(newToken);
+      if (_pushEnabled) {
+        _tokenManager.registerTokenWithRetry(newToken);
+      }
     });
 
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
@@ -139,6 +140,31 @@ class FirebaseMessagingService {
     } catch (e) {
       print('[FCM] Error handling notification tap: $e');
       // Non-fatal: app continues even if tap handling fails
+    }
+  }
+
+  Future<void> syncPushPreference(bool enabled) async {
+    _pushEnabled = enabled;
+    if (!_pushEnabled) {
+      print('[FCM] Push preference set to disabled');
+      return;
+    }
+
+    await _registerCurrentToken();
+  }
+
+  Future<void> _registerCurrentToken() async {
+    try {
+      print('[FCM] Getting token...');
+      final token = await FirebaseMessaging.instance.getToken();
+      print('[FCM] Token = $token');
+      if (token != null && token.isNotEmpty) {
+        await _tokenManager.registerTokenWithRetry(token);
+      } else {
+        print('[FCM] getToken() returned null or empty');
+      }
+    } catch (e) {
+      print('[FCM] Failed to get token: $e');
     }
   }
 
