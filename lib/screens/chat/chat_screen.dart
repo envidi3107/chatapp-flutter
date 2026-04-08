@@ -22,6 +22,7 @@ import '../../services/message_service.dart';
 import '../../services/realtime_service.dart';
 import '../../services/user_service.dart';
 import 'group_members_screen.dart';
+import 'join_video_call_screen.dart';
 import '../../widgets/message_bubble.dart';
 
 class ChatScreen extends StatelessWidget {
@@ -1580,6 +1581,18 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             onPressed: chat.loadMessages,
+          ),
+          IconButton(
+            icon: const Icon(Icons.video_call),
+            tooltip: 'Bắt đầu cuộc gọi video',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const JoinVideoCallScreen(),
+                ),
+              );
+            },
           ),
         ],
       ),

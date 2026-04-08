@@ -9,6 +9,7 @@ import 'providers/auth_provider.dart';
 import 'providers/chat_rooms_provider.dart';
 import 'providers/invitation_provider.dart';
 import 'providers/user_search_provider.dart';
+import 'providers/video_call_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/chat/chat_screen.dart';
 import 'screens/home/home_screen.dart';
@@ -240,6 +241,9 @@ List<SingleChildWidget> createAppProviders({
         invitationService,
         realtimeService,
       ),
+    ),
+    ChangeNotifierProvider(
+      create: (_) => VideoCallProvider(),
     ),
   ];
 }
