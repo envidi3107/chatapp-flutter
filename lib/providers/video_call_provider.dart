@@ -63,7 +63,7 @@ class VideoCallProvider with ChangeNotifier {
   }
 
   /// Initialize the video call
-  Future<void> initializeCall(String channelName) async {
+  Future<void> initializeCall(String channelName, {String? token, int uid = 0}) async {
     if (channelName.isEmpty) {
       _statusMessage = 'Channel name cannot be empty';
       notifyListeners();
@@ -86,8 +86,8 @@ class VideoCallProvider with ChangeNotifier {
       await _agoraService.initAgora(
         appId: AgoraConfig.appId,
         channelName: channelName,
-        token: AgoraConfig.token,
-        uid: AgoraConfig.defaultUid,
+        token: token ?? AgoraConfig.token,
+        uid: uid,
       );
 
       _isInitialized = true;

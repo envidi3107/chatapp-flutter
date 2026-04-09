@@ -307,6 +307,55 @@ class ReadStatusEvent {
   }
 }
 
+class VideoCallEvent {
+  const VideoCallEvent({
+    required this.roomId,
+    required this.channelName,
+    required this.agoraToken,
+    required this.senderUsername,
+    required this.senderDisplayName,
+    required this.senderAvatar,
+  });
+
+  final int roomId;
+  final String channelName;
+  final String agoraToken;
+  final String senderUsername;
+  final String senderDisplayName;
+  final String senderAvatar;
+
+  factory VideoCallEvent.fromJson(Map<String, dynamic> json) {
+    return VideoCallEvent(
+      roomId: json['roomId'] is int ? json['roomId'] : int.parse(json['roomId'].toString()),
+      channelName: json['channelName']?.toString() ?? '',
+      agoraToken: json['agoraToken']?.toString() ?? '',
+      senderUsername: json['senderUsername']?.toString() ?? '',
+      senderDisplayName: json['senderDisplayName']?.toString() ?? '',
+      senderAvatar: json['senderAvatar']?.toString() ?? '',
+    );
+  }
+}
+
+class VideoCallRejectedEvent {
+  const VideoCallRejectedEvent({
+    required this.roomId,
+    required this.rejectedBy,
+    required this.rejectedByUsername,
+  });
+
+  final int roomId;
+  final String rejectedBy;
+  final String rejectedByUsername;
+
+  factory VideoCallRejectedEvent.fromJson(Map<String, dynamic> json) {
+    return VideoCallRejectedEvent(
+      roomId: json['roomId'] is int ? json['roomId'] : int.parse(json['roomId'].toString()),
+      rejectedBy: json['rejectedBy']?.toString() ?? '',
+      rejectedByUsername: json['rejectedByUsername']?.toString() ?? '',
+    );
+  }
+}
+
 class RealtimeService {
   RealtimeService(this._tokenStorage, this._apiClient);
 
@@ -348,6 +397,10 @@ class RealtimeService {
       StreamController<UserWithAvatarModel>.broadcast();
   final StreamController<UserBlockStatusModel> _blockStatusController =
       StreamController<UserBlockStatusModel>.broadcast();
+  final StreamController<VideoCallEvent> _videoCallController =
+      StreamController<VideoCallEvent>.broadcast();
+  final StreamController<VideoCallRejectedEvent> _videoCallRejectedController =
+      StreamController<VideoCallRejectedEvent>.broadcast();
   final Map<int, StreamController<MessageReceiveModel>> _roomControllers = {};
   final Map<int, StreamController<TypingStatusEvent>> _typingControllers = {};
   final Map<int, StreamController<ReadStatusEvent>> _readControllers = {};
@@ -377,6 +430,9 @@ class RealtimeService {
   Stream<UserWithAvatarModel> get profileStream => _profileController.stream;
   Stream<UserBlockStatusModel> get blockStatusStream =>
       _blockStatusController.stream;
+  Stream<VideoCallEvent> get videoCallStream => _videoCallController.stream;
+  Stream<VideoCallRejectedEvent> get videoCallRejectedStream =>
+      _videoCallRejectedController.stream;
 
   Stream<MessageReceiveModel> roomMessageStream(int roomId) {
     _requestedRooms.add(roomId);
@@ -473,6 +529,7 @@ class RealtimeService {
           _subscribePresence();
           _subscribeProfileUpdates();
           _subscribeBlockStatusUpdates();
+          _subscribeVideoCalls();
           for (final roomId in _requestedRooms) {
             _subscribeRoom(roomId);
             _subscribeTyping(roomId);
@@ -552,6 +609,8 @@ class RealtimeService {
     _presenceController.close();
     _profileController.close();
     _blockStatusController.close();
+    _videoCallController.close();
+    _videoCallRejectedController.close();
     for (final controller in _roomControllers.values) {
       controller.close();
     }
@@ -564,6 +623,36 @@ class RealtimeService {
     _roomControllers.clear();
     _typingControllers.clear();
     _readControllers.clear();
+  }
+
+  void _subscribeVideoCalls() {
+    _client?.subscribe(
+      destination: '/user/queue/calls/video',
+      callback: (frame) {
+        final body = frame.body;
+        if (body == null || body.isEmpty) {
+          return;
+        }
+
+        final decoded = jsonDecode(body);
+        if (decoded is! Map<String, dynamic>) {
+          return;
+        }
+
+        _videoCallController.add(VideoCallEvent.fromJson(decoded));
+      },
+    );
+
+    _client?.subscribe(
+      destination: '/user/queue/calls/video_rejected',
+      callback: (frame) {
+        final body = frame.body;
+        if (body == null || body.isEmpty) return;
+        final decoded = jsonDecode(body);
+        if (decoded is! Map<String, dynamic>) return;
+        _videoCallRejectedController.add(VideoCallRejectedEvent.fromJson(decoded));
+      },
+    );
   }
 
   void _subscribeInvitations() {

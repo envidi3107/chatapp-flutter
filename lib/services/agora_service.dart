@@ -1,5 +1,6 @@
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 class AgoraService {
   late RtcEngine _agoraRtcEngine;
@@ -36,6 +37,7 @@ class AgoraService {
 
       // Enable video
       await _agoraRtcEngine.enableVideo();
+      await _agoraRtcEngine.startPreview();
 
       // Set video configuration
       await _agoraRtcEngine.setVideoEncoderConfiguration(
@@ -50,7 +52,9 @@ class AgoraService {
       _registerEventHandlers();
 
       // Enable web SDK interoperability
-      await _agoraRtcEngine.enableWebSdkInteroperability(true);
+      if (!kIsWeb) {
+        await _agoraRtcEngine.enableWebSdkInteroperability(true);
+      }
 
       // Join channel
       await _agoraRtcEngine.joinChannel(

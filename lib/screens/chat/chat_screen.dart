@@ -21,8 +21,11 @@ import '../../models/user_with_avatar_model.dart';
 import '../../services/message_service.dart';
 import '../../services/realtime_service.dart';
 import '../../services/user_service.dart';
+import '../../services/chat_room_service.dart';
+import '../../providers/video_call_provider.dart';
 import 'group_members_screen.dart';
 import 'join_video_call_screen.dart';
+import 'video_call_screen.dart';
 import '../../widgets/message_bubble.dart';
 
 class ChatScreen extends StatelessWidget {
@@ -1585,13 +1588,45 @@ class _ChatViewState extends State<_ChatView> with WidgetsBindingObserver {
           IconButton(
             icon: const Icon(Icons.video_call),
             tooltip: 'Bắt đầu cuộc gọi video',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const JoinVideoCallScreen(),
-                ),
-              );
+            onPressed: messages.isEmpty ? null : () async {
+              try {
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const Center(child: CircularProgressIndicator()),
+                );
+                
+                final roomService = context.read<ChatRoomService>();
+                final callInfo = await roomService.initiateVideoCall(roomId: widget.roomId);
+                
+                if (!mounted) return;
+                Navigator.pop(context); // Close loading dialog
+                
+                final provider = context.read<VideoCallProvider>();
+                await provider.initializeCall(
+                  callInfo['channelName'] as String,
+                  token: callInfo['token'] as String?,
+                  uid: callInfo['uid'] as int? ?? 0,
+                );
+                
+                if (provider.isInitialized && mounted) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => VideoCallScreen(
+                        roomId: widget.roomId,
+                        roomName: _roomDisplayName,
+                        isCaller: true,
+                      ),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (!mounted) return;
+                Navigator.pop(context); // Close loading dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to start video call: $e')),
+                );
+              }
             },
           ),
         ],

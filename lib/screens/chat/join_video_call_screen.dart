@@ -90,7 +90,10 @@ class _JoinVideoCallScreenState extends State<JoinVideoCallScreen> {
     if (provider.isInitialized && mounted) {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => const VideoCallScreen(),
+          builder: (context) => VideoCallScreen(
+            roomId: 0,
+            roomName: _channelController.text,
+          ),
         ),
       );
     }

@@ -1,4 +1,6 @@
 import 'dart:async';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:js' as js;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,7 +10,10 @@ import '../../providers/auth_provider.dart';
 import '../../providers/chat_rooms_provider.dart';
 import '../../providers/invitation_provider.dart';
 import '../../providers/user_search_provider.dart';
+import '../../providers/video_call_provider.dart';
+import '../../services/chat_room_service.dart';
 import '../../services/realtime_service.dart';
+import '../chat/video_call_screen.dart';
 import 'add_friend_screen.dart';
 import 'chat_list_screen.dart';
 import 'chatbot_screen.dart';
@@ -28,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _tabIndex = 0;
   StreamSubscription? _invitationNotificationSub;
   StreamSubscription? _profileSub;
+  StreamSubscription? _videoCallSub;
   InvitationProvider? _invitationProvider;
 
   static const _tabs = [
@@ -59,6 +65,171 @@ class _HomeScreenState extends State<HomeScreen> {
         return 'Trò chuyện';
     }
   }
+
+  void _showIncomingCallDialog(VideoCallEvent event) {
+    // Play ringtone on Web using JS interop
+    _playRingtone();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1C1C2E),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Cuộc gọi đến',
+                    style: TextStyle(color: Colors.white60, fontSize: 14, letterSpacing: 1),
+                  ),
+                  const SizedBox(height: 20),
+                  if (event.senderAvatar.isNotEmpty)
+                    CircleAvatar(
+                      radius: 44,
+                      backgroundImage: NetworkImage(event.senderAvatar),
+                    )
+                  else
+                    const CircleAvatar(
+                      radius: 44,
+                      backgroundColor: Color(0xFF3A3A5C),
+                      child: Icon(Icons.person, size: 44, color: Colors.white70),
+                    ),
+                  const SizedBox(height: 16),
+                  Text(
+                    event.senderDisplayName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Đang gọi video cho bạn...',
+                    style: TextStyle(color: Colors.white54, fontSize: 14),
+                  ),
+                  const SizedBox(height: 36),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // Decline button
+                      Column(
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                            _stopRingtone();
+                            Navigator.pop(dialogContext);
+                            // Notify caller that we rejected
+                            try {
+                              await context.read<ChatRoomService>().rejectVideoCall(
+                                roomId: event.roomId,
+                              );
+                            } catch (_) {}
+                          },
+                            child: Container(
+                              width: 64,
+                              height: 64,
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.call_end, color: Colors.white, size: 28),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('Từ chối', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        ],
+                      ),
+                      // Accept button
+                      Column(
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              _stopRingtone();
+                              Navigator.pop(dialogContext);
+
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (ctx) => const Center(child: CircularProgressIndicator()),
+                              );
+
+                              try {
+                                final provider = context.read<VideoCallProvider>();
+                                await provider.initializeCall(
+                                  event.channelName,
+                                  token: event.agoraToken,
+                                  uid: 0,
+                                );
+
+                                if (!mounted) return;
+                                Navigator.pop(context);
+
+                                if (provider.isInitialized) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => VideoCallScreen(
+                                        roomId: event.roomId,
+                                        roomName: event.senderDisplayName,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (!mounted) return;
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Không thể tham gia cuộc gọi: $e')),
+                                );
+                              }
+                            },
+                            child: Container(
+                              width: 64,
+                              height: 64,
+                              decoration: const BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.videocam, color: Colors.white, size: 28),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('Trả lời', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    ).then((_) => _stopRingtone());
+  }
+
+  void _playRingtone() {
+    try {
+      js.context.callMethod('playRingtone', ['assets/lib/assets/facebook_call.mp3']);
+    } catch (_) {}
+  }
+
+  void _stopRingtone() {
+    try {
+      js.context.callMethod('stopRingtone', []);
+    } catch (_) {}
+  }
+
 
   @override
   void initState() {
@@ -102,6 +273,12 @@ class _HomeScreenState extends State<HomeScreen> {
         context.read<UserSearchProvider>().applyUserProfileUpdate(profile);
         context.read<InvitationProvider>().applyUserProfileUpdate(profile);
       });
+
+      _videoCallSub =
+          context.read<RealtimeService>().videoCallStream.listen((event) {
+        if (!mounted) return;
+        _showIncomingCallDialog(event);
+      });
     });
   }
 
@@ -110,6 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _invitationProvider?.setInvitesViewActive(false);
     _invitationNotificationSub?.cancel();
     _profileSub?.cancel();
+    _videoCallSub?.cancel();
     _invitationProvider?.stopRealtime();
     super.dispose();
   }

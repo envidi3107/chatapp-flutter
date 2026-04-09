@@ -31,8 +31,43 @@
 
   <title>messenger_app</title>
   <link rel="manifest" href="manifest.json">
+  <script src="https://download.agora.io/sdk/release/iris-web-rtc_n450_w4220_0.8.6.js"></script>
 </head>
 <body>
+  <script>
+    // Audio unlock + ringtone helpers called from Flutter via js_interop
+    var _ringtoneAudio = null;
+    
+    function playRingtone(src) {
+      try {
+        if (_ringtoneAudio) {
+          _ringtoneAudio.pause();
+          _ringtoneAudio = null;
+        }
+        var audio = new Audio(src);
+        audio.loop = true;
+        audio.volume = 0.85;
+        // Return the promise; browser allows play if it was triggered by an event or AudioContext unlocked
+        var promise = audio.play();
+        if (promise !== undefined) {
+          promise.catch(function(e) {
+            // Autoplay was prevented — try unlocking via AudioContext
+            var ctx = new (window.AudioContext || window.webkitAudioContext)();
+            ctx.resume().then(function() { audio.play(); });
+          });
+        }
+        _ringtoneAudio = audio;
+      } catch(e) { console.error('playRingtone error', e); }
+    }
+    
+    function stopRingtone() {
+      if (_ringtoneAudio) {
+        _ringtoneAudio.pause();
+        _ringtoneAudio.currentTime = 0;
+        _ringtoneAudio = null;
+      }
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

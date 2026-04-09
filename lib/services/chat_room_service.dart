@@ -22,6 +22,24 @@ class ChatRoomService {
         .toList();
   }
 
+  Future<Map<String, dynamic>> initiateVideoCall({required int roomId}) async {
+    final response = await _apiClient.postJson(
+      '/api/v1/chatrooms/$roomId/call',
+      const {},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Initiate video call failed: ${response.body}');
+    }
+
+    return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+  }
+
+  Future<void> rejectVideoCall({required int roomId}) async {
+    await _apiClient.postJson('/api/v1/chatrooms/$roomId/call/reject', const {});
+    // Ignore errors - best effort
+  }
+
   Future<void> removeFriend({required int roomId}) async {
     final response =
         await _apiClient.delete('/api/v1/chatrooms/$roomId/friend/');
